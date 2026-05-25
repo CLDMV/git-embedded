@@ -1,0 +1,96 @@
+{
+	"name": "@cldmv/git-embedded",
+	"version": "1.0.0",
+	"description": "Manage embedded git repositories (anonymous gitlinks) without .gitmodules. Provides hooks that restore standard git-command ergonomics for embedded children while keeping the child's origin URL out of the public parent repo.",
+	"type": "module",
+	"license": "Apache-2.0",
+	"engines": {
+		"node": ">=20.19.0"
+	},
+	"author": {
+		"name": "Shinrai",
+		"company": "CLDMV",
+		"email": "git+npm@cldmv.net",
+		"url": "https://cldmv.net"
+	},
+	"contributors": [
+		{
+			"name": "CLDMV",
+			"url": "https://github.com/CLDMV"
+		}
+	],
+	"funding": {
+		"type": "github",
+		"url": "https://github.com/sponsors/shinrai"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"sideEffects": false,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/CLDMV/git-embedded.git"
+	},
+	"bugs": {
+		"url": "https://github.com/CLDMV/git-embedded/issues"
+	},
+	"homepage": "https://github.com/CLDMV/git-embedded#readme",
+	"keywords": [
+		"git",
+		"gitlink",
+		"submodule",
+		"anonymous-submodule",
+		"embedded",
+		"embedded-repo",
+		"private",
+		"hooks",
+		"hooks-installer",
+		"gitmodules-free",
+		"reference-transaction",
+		"post-checkout",
+		"post-merge",
+		"post-rewrite",
+		"dispatcher",
+		"cli"
+	],
+	"files": [
+		"bin",
+		"src",
+		"hooks",
+		"messages",
+		"docs",
+		"README.md",
+		"LICENSE"
+	],
+	"bin": {
+		"git-embedded": "./bin/git-embedded.mjs"
+	},
+	"scripts": {
+		"start": "node bin/git-embedded.mjs",
+		"test": "vitest run --config .configs/vitest.config.mjs",
+		"test:watch": "vitest --config .configs/vitest.config.mjs",
+		"coverage": "vitest run --coverage --config .configs/vitest.config.mjs",
+		"lint": "eslint --config .configs/eslint.config.mjs .",
+		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
+		"format": "prettier --config .configs/.prettierrc --write .",
+		"format:check": "prettier --config .configs/.prettierrc --check ."
+	},
+	"dependencies": {
+		"@cldmv/slothlet": "^3.7.0",
+		"@cldmv/wisp": "^1.0.1",
+		"chalk": "^5.4.1",
+		"commander": "^14.0.0",
+		"marked": "^15.0.12",
+		"marked-terminal": "^7.3.0"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.18.0",
+		"@eslint/json": "^0.10.0",
+		"@eslint/markdown": "^6.2.2",
+		"@vitest/coverage-v8": "^2.1.9",
+		"eslint": "^9.18.0",
+		"globals": "^15.14.0",
+		"prettier": "^3.4.2",
+		"vitest": "^2.1.9"
+	}
+}

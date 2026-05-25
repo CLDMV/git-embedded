@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# reference-transaction
+#
+# Refuses HEAD-moving git operations if any embedded git repo in the parent's
+# tree has uncommitted changes. Without this, a `git checkout B` in the parent
+# would silently leave the child stale (with the post-checkout updater unable
+# to update over dirty state), producing a confusing inconsistent state.
+#
+# Requires git 2.28+ (released July 2020, when reference-transaction was
+# introduced).
+#
+# Phases (passed as $1 by git):
+#   - prepared:  updates queued, not yet applied. Exiting non-zero ABORTS the
+#                transaction. This is the only phase we act on.
+#   - committed: updates already applied (informational; we ignore).
+#   - aborted:   updates rejected by some other handler (informational).
+#
+# The hook reads proposed ref updates from stdin, one per line:
+#   <old_sha> <new_sha> <ref-name>
+#
+# We filter to HEAD updates with old != new (an actual HEAD move). Other ref
+# updates (branch fast-forwards from fetch, stash refs, tag creation, etc.)
+# don't touch the working tree and shouldn't be guarded.
+
+# Only the 'prepared' phase can reject the transaction.
+[ "$1" = "prepared" ] || exit 0
+
+# Detect whether any update in this transaction moves HEAD.
+moving_head=0
+while read old_sha new_sha ref; do
+    [ "$ref" = "HEAD" ] || continue
+    [ "$old_sha" = "$new_sha" ] && continue
+    moving_head=1
+done
+
+# Nothing to check if HEAD is not moving.
+[ "$moving_head" = "1" ] || exit 0
+
+# Walk every gitlink in the current HEAD and check for dirty state.
+# A gitlink is a tree entry with type 'commit' (mode 160000). The path is
+# the directory in the parent's working tree that holds the embedded repo.
+while read mode type sha path; do
+    [ "$type" = "commit" ] || continue
+    [ -d "$path/.git" ] || [ -f "$path/.git" ] || continue
+
+    # Refuse if there are uncommitted changes inside the embedded repo.
+    if ! (cd "$path" && git diff-index --quiet HEAD --) 2>/dev/null; then
+        echo "git-embedded: ✗ $path has uncommitted changes" >&2
+        echo "  commit or stash inside $path/ before moving HEAD here" >&2
+        exit 1
+    fi
+done < <(git ls-tree -r HEAD 2>/dev/null)
+
+exit 0

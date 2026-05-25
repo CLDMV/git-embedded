@@ -1,0 +1,39 @@
+{
+	"source": {
+		"includePattern": ".+\\.(mjs|cjs|js)(doc|x)?$",
+		"excludePattern": "(\\.config|dist|build|node_modules)/"
+	},
+	"tags": { "dictionaries": ["jsdoc", "closure"] },
+	"plugins": ["plugins/markdown"],
+	"opts": {
+		"encoding": "utf8",
+		"destination": "./docs/",
+		"recurse": true
+	},
+	"separators": true,
+	"jsdoc2md": {
+		"separators": true
+	},
+	"targets": [
+		{
+			"src": "src/**/*.mjs",
+			"dest": "docs/generated/API.md"
+		},
+		{
+			"src": "api_tests/api_test/**/*.mjs",
+			"dest": "docs/generated/api_tests/api_test.md"
+		},
+		{
+			"src": "api_tests/api_test_cjs/**/*.cjs",
+			"dest": "docs/generated/api_tests/api_test_cjs.md"
+		},
+		{
+			"src": "api_tests/api_test_mixed/**/*.{mjs,cjs}",
+			"dest": "docs/generated/api_tests/api_test_mixed.md"
+		},
+		{
+			"src": "tools/dev/**/*.mjs",
+			"dest": "docs/tools/build-tools.md"
+		}
+	]
+}

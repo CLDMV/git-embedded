@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Global git hook dispatcher (canonical, policy-free).
+#
+# Installed by `git embedded install-hooks` when no prior hook setup is
+# detected. The installer:
+#   1. Writes this script to the user's chosen hooks directory (default
+#      ~/.config/git/hooks/_dispatch).
+#   2. Links every standard hook name (applypatch-msg, commit-msg,
+#      post-applypatch, post-checkout, post-commit, post-merge,
+#      post-rewrite, pre-applypatch, pre-auto-gc, pre-commit,
+#      pre-merge-commit, pre-push, pre-rebase, prepare-commit-msg,
+#      reference-transaction) to this script — symlink on Linux/macOS,
+#      hard link on Windows (with --no-symlinks), or copy as fallback.
+#   3. Sets `git config --global core.hooksPath` to the chosen directory.
+#
+# Behavior at hook-fire time:
+#   1. (Optional) apply user-added global policy below.
+#   2. Chain to the per-repo `.git/hooks/<hook-name>` if one exists.
+#      This is what makes a global `core.hooksPath` coexist with per-repo
+#      hooks — without the chain, per-repo hooks would be silently
+#      shadowed.
+#
+# Customizing:
+#   Add your own policies in the `--- global policy ---` block below.
+#   `$hook` holds the hook name (e.g. `commit-msg`, `pre-push`).
+#   `$1`...`$N` and stdin are the hook's native arguments / input per
+#   the git hooks documentation.
+#   Exit non-zero from a case branch to reject the operation.
+#
+# DO NOT EDIT the chain-to-repo-hook block at the bottom unless you
+# understand the consequences. It's load-bearing for `git-embedded`'s
+# own hooks (post-checkout, post-merge, post-rewrite,
+# reference-transaction) to reach the per-repo `.git/hooks/` directory
+# where they're installed.
+
+hook=$(basename "$0")
+
+# --- global policy --------------------------------------------------------
+# Add your hook-event-specific logic here. Example template:
+#
+# case "$hook" in
+# commit-msg)
+#     # $1 is the path to the proposed commit message file.
+#     # if grep -qiE 'YOUR_PATTERN' "$1"; then
+#     #     echo >&2 "✗ commit rejected: <reason>"
+#     #     exit 1
+#     # fi
+#     ;;
+# pre-push)
+#     # stdin has one line per ref:
+#     #   <local_ref> <local_sha> <remote_ref> <remote_sha>
+#     # while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+#     #     ...
+#     # done
+#     ;;
+# esac
+
+# --- chain to the repository's own hook, if any --------------------------
+# (Load-bearing for git-embedded; do not remove.)
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
+repo_hook="$git_dir/hooks/$hook"
+if [ -x "$repo_hook" ] && [ "$repo_hook" != "$0" ]; then
+    exec "$repo_hook" "$@"
+fi
+
+exit 0

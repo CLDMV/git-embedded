@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# update-embedded-repos
+#
+# Generic gitlink updater: finds every embedded git repo (gitlink with a
+# working .git/ in the parent's tree) and updates it to the pinned SHA recorded
+# in the parent's HEAD. Uses the child's own remote config — does NOT read or
+# require .gitmodules.
+#
+# Install as post-checkout, post-merge, AND post-rewrite to cover the full
+# set of standard checkout-flavored git operations (checkout, switch, bisect,
+# pull, merge, rebase, cherry-pick). The script is identical for each hook
+# name; link or copy to the right names.
+#
+# Exit status:
+#   - Always 0. This hook runs AFTER the parent operation has completed, so
+#     signalling failure here cannot undo the parent move. The companion
+#     reference-transaction hook is what prevents unsafe moves in the first
+#     place; this hook only carries out the working-tree side of the work.
+#   - A failure to update a single child is reported to stderr and the script
+#     continues to the next child.
+
+# Walk every gitlink in the current HEAD and update the embedded child.
+# Tree entries from `git ls-tree -r HEAD`:
+#   <mode> SP <type> SP <sha> TAB <path>
+# Bash 'read' splits on $IFS (whitespace), so the four fields land in the
+# four variables below. A path with a tab in it would split further; gitlink
+# paths in practice are directory names and don't contain tabs.
+while read mode type sha path; do
+    [ "$type" = "commit" ] || continue
+    [ -d "$path/.git" ] || [ -f "$path/.git" ] || continue
+
+    # Skip if already at the pinned SHA — idempotent re-runs are no-ops.
+    current=$(cd "$path" && git rev-parse HEAD 2>/dev/null) || continue
+    [ "$current" = "$sha" ] && continue
+
+    # Fetch from the child's own origin if the pinned SHA isn't local.
+    # The child has its own remote config (set up at clone time); no need
+    # to consult .gitmodules for the URL.
+    if ! (cd "$path" && git cat-file -e "${sha}^{commit}" 2>/dev/null); then
+        if ! (cd "$path" && git fetch --quiet 2>/dev/null); then
+            echo "git-embedded: warning: $path: fetch from child's own remote failed" >&2
+            echo "  (cannot resolve pinned SHA $sha)" >&2
+            continue
+        fi
+    fi
+
+    # Detached HEAD on the pinned SHA. The parent pins a commit, not a branch,
+    # so the child ends up detached after each parent operation. Re-attach to
+    # a branch manually inside the child if you intend to make changes there.
+    if ! (cd "$path" && git checkout --quiet --detach "$sha" 2>/dev/null); then
+        echo "git-embedded: warning: $path: could not check out $sha" >&2
+        echo "  (parent at this commit pins $path to $sha — resolve manually in $path/)" >&2
+    fi
+done < <(git ls-tree -r HEAD 2>/dev/null)
+
+exit 0
