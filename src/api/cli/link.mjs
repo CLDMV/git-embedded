@@ -5,7 +5,7 @@ export const spec = {
 	description:
 		"Clone a remote repo into <local-path> and stage it as an anonymous gitlink. Does NOT commit (you may want to stage other things in the same commit).",
 	args: [
-		["<local-path>", "Where to clone the child repo (created if missing)"],
+		["<local-path>", "Where to clone the child repo (created if missing; an empty gitlink dir is accepted)"],
 		["<remote-url>", "The child repo's clone URL (will NOT be recorded in .gitmodules)"]
 	],
 	examples: [
@@ -14,11 +14,27 @@ export const spec = {
 	]
 };
 
+/**
+ * Whether `dir` blocks a fresh clone. A missing path is fine, and an empty
+ * directory is fine (a fresh clone of the parent materializes each gitlink as
+ * an empty dir). A directory with contents — or an existing repo — is refused.
+ * @param {string} dir
+ * @returns {boolean}
+ */
+function isNonEmpty(dir) {
+	const { fs } = context;
+	try {
+		return fs.readdirSync(dir).length > 0;
+	} catch {
+		return false;
+	}
+}
+
 export function run(localPath, remoteUrl) {
 	const { fs, spawnSync } = context;
 
-	if (fs.existsSync(localPath)) {
-		self.report.error(`${localPath} already exists. Remove it or pick a different path before linking.`);
+	if (fs.existsSync(localPath) && isNonEmpty(localPath)) {
+		self.report.error(`${localPath} already exists and is not empty. Remove it or pick a different path before linking.`);
 		process.exit(2);
 	}
 
@@ -34,6 +50,11 @@ export function run(localPath, remoteUrl) {
 		self.report.error(`git add ${localPath} exited with status ${add.status}`);
 		process.exit(add.status || 1);
 	}
+
+	// Record the URL + branch into the parent's LOCAL config registry (never
+	// committed) so a later restore/export already knows this child.
+	const root = self.git.getRepoRoot() || process.cwd();
+	self.embedded.registry.recordOne(localPath, root);
 
 	self.report.success(`Staged gitlink at ${localPath} (no .gitmodules entry written).`);
 	self.report.plain("Commit when ready: git commit -m 'embed <name>'");
