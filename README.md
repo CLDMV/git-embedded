@@ -86,6 +86,62 @@ git config advice.addEmbeddedRepo false
 
 The committed parent tree now contains a gitlink at `embedded-child` pinning the child's current HEAD. No `.gitmodules` is created; the child's URL never lands in the public repo.
 
+`link` clones into a missing **or empty** target directory (a fresh clone of a parent materializes each gitlink as an empty dir, so `link` works to fill one in); it refuses only a non-empty directory. After staging, it also records the child's URL and branch into this clone's local registry (see below).
+
+## Restoring embedded children (machine-B bootstrap)
+
+The parent commits only anonymous gitlinks — a path and a pinned SHA, never a URL. So a fresh clone of the parent materializes each embedded child as an _empty directory_: git knows the pin but has nowhere to fetch it from. `git embedded restore` fills those directories in.
+
+```bash
+git clone <parent-url> myproject
+cd myproject
+git embedded restore          # clone every embedded child and check out its pinned SHA
+```
+
+`restore` resolves each child's clone URL from up to four **optional** sources, strictest first, stopping at the first that yields a URL:
+
+1. **Local config registry** — `embedded.<path>.url` in _this clone's_ `.git/config`. Per-clone, never committed. Written automatically after a successful restore, and by `record` / `link`.
+2. **Manifest file** (`--from <file>`) — a JSON transfer file carried out-of-band (never committed). See `export` below.
+3. **`--base <url-base>`** — derives `<url-base>/<basename>.git` for each child.
+4. **Convention** (zero state) — the child is a sibling of wherever the parent was cloned from: `dirname(parent origin) + "/" + basename(<path>) + ".git"`. No configuration, but it only resolves when the child's repository is actually named after the gitlink path and sits beside the parent. A convention guess can only ever name strings already derivable from the committed tree, so it discloses nothing new.
+
+Every clone is **SHA-verified**: the parent's pinned commit must exist in the freshly cloned child (a `git fetch` is attempted first). If it doesn't — e.g. a convention guess resolved to the wrong repository — the clone `restore` created is removed and the child is reported `pinned-mismatch`. A wrong guess fails closed; it never plants the wrong code.
+
+Per-child outcomes are `restored`, `already-present`, `unresolved`, `pinned-mismatch`, or `skipped`, and `restore` exits non-zero if any child ends `unresolved` or `pinned-mismatch`. Use `--dry-run` to report resolution without cloning.
+
+**Partial restore is the normal case.** A public contributor without access to a private child simply skips it:
+
+```bash
+git embedded restore --skip tests            # comma-separate several: --skip tests,vendor/foo
+```
+
+### Obscured children
+
+A child whose repository name does not match its gitlink path — the intended state for a hidden private child — is deliberately _not_ convention-resolvable. Provide its URL once (via `link` into the empty gitlink dir, or `record` if it is already cloned) and this clone's registry remembers it for every later restore:
+
+```bash
+git embedded link tests git@example.com:org/private-tests.git
+# ...or, if the child is already present on disk:
+git embedded record
+```
+
+### Sharing URLs between machines: `export` / `record`
+
+`record` writes the origin URL (and current branch) of every present child into the local registry. `export` serializes that registry to a manifest another machine can consume:
+
+```bash
+git embedded export --scan -o children.json   # record present children, then write the manifest
+```
+
+On the other machine:
+
+```bash
+git clone <parent-url> myproject && cd myproject
+git embedded restore --from children.json
+```
+
+> **Never commit the manifest.** It contains the very URLs the anonymous-gitlink design keeps out of the tree. When `export -o` writes inside the worktree it appends the filename to `.git/info/exclude` as a courtesy, but keeping the manifest out-of-band is your responsibility.
+
 ## Manual install (no CLI)
 
 If you'd rather wire things up by hand:

@@ -1,6 +1,6 @@
 # Design: hooks for embedded git repositories
 
-This document describes the hook system that `@cldmv/git-embedded` installs and the design choices behind it. It is intended for anyone evaluating the approach, debugging an installed hook, or working on the planned CLI.
+This document describes the hook system that `@cldmv/git-embedded` installs and the design choices behind it. It is intended for anyone evaluating the approach, debugging an installed hook, or working on the CLI.
 
 ## Background: gitlinks, submodules, and the registration gap
 
@@ -108,10 +108,43 @@ The detached-HEAD checkout matches standard submodule behavior: parents pin spec
 | `git status` divergence | Yes | Yes |
 | `git add path` infers SHA | Yes | Yes |
 | `--recurse-submodules` clone | Pulls child | No-op (no registry) |
-| Initial child clone | Automatic via registry | Manual or via the planned CLI |
+| Initial child clone | Automatic via registry | `git embedded restore` (SHA-verified; see [Provisioning](#provisioning-restoring-embedded-children)) |
 | Dirty-child guard | Default refuses on update | Hook refuses on the HEAD move itself |
 
 The most useful difference is the **guard timing**. Standard submodules let the parent operation proceed and then refuse the child update, leaving the developer in a parent-moved-child-stale state that has to be backed out. The `reference-transaction` guard refuses the whole transaction at the parent level, so the working tree never reaches the inconsistent state.
+
+## Provisioning: restoring embedded children
+
+The hooks above keep an *already-cloned* child in sync with the parent's pin. They do not perform the *initial* clone, because the parent tree deliberately records no URL to clone from. Standard submodules get the initial clone from the `.gitmodules` registry; anonymous gitlinks need another way to answer "where does this child come from?" without committing the answer.
+
+`git embedded restore` is that mechanism. It enumerates the gitlinks in HEAD (the same `git ls-tree -r HEAD`, mode-`160000` walk the hooks use) and, for every child that is missing, empty, or lacks a `.git`, resolves a clone URL, clones, verifies, and checks out the pin. The design's core property holds throughout: child URLs are never committed.
+
+### URL knowledge lives in three optional layers
+
+URL knowledge is never in the committed tree. It can only come from one of three optional layers, tried strictest-first at resolve time:
+
+1. **Local config registry** — `embedded.<path>.url` / `embedded.<path>.branch` in the parent clone's `.git/config`. Per-clone, never committed, never leaves the machine that wrote it. This is the durable record: a successful restore writes it, as do `record` and `link`.
+2. **Manifest** — a JSON transfer file (`{ "version": 1, "children": { "<path>": { "url": …, "branch": … } } }`) passed via `--from`. It is a transfer format only: it lives outside any repo, in the operator's hands, and is never committed. `export` produces it from the registry; `restore --from` consumes it.
+3. **Convention** — with zero recorded state, the child is assumed to be a sibling of wherever the parent was cloned from: `dirname(parent remote.origin.url) + "/" + basename(<path>) + ".git"`.
+
+`--base <url-base>` sits between the manifest and convention as an explicit one-off override (`<url-base>/<basename>.git`), useful when children live under a known base that differs from the parent's origin.
+
+### Why convention discloses nothing
+
+The convention layer looks like it might leak, but it cannot reveal anything not already implied by the committed tree. The gitlink path (e.g. `tests`) and the parent's own origin are both already visible to anyone who has the parent. Convention only *combines* them into a guess — it invents no new information — and because the guess is a guess, it is not trusted. It is SHA-verified.
+
+### SHA verification makes wrong guesses fail closed
+
+After every clone, the parent's pinned SHA must exist in the cloned child (`git cat-file -e <sha>^{commit}`, retried once after a `git fetch origin`). If it is absent, the clone `restore` created is removed — never a pre-existing directory — and the child is reported `pinned-mismatch` with a non-zero exit. A convention guess that resolves to the wrong repository (or an out-of-date one) therefore fails closed rather than silently planting unrelated code at the pinned path. Only a repository that actually contains the pinned commit is accepted.
+
+An *obscured* child — one whose repository name does not match its gitlink path — is by construction not convention-resolvable, which is exactly the property that keeps a private child hidden. Such a child is reachable only through layer 1 or layer 2: someone with access records its URL (via `link` or `record`) or is handed a manifest. A public cloner without either simply `--skip`s it; partial restore is the expected outcome, not an error.
+
+### The commands
+
+- `restore [paths…] [--from <manifest>] [--base <url-base>] [--skip <paths>] [--dry-run]` — resolve, clone, SHA-verify, detach-checkout the pin, and record the resolved URL. Per-child outcome is one of `restored`, `already-present`, `unresolved`, `pinned-mismatch`, `skipped`; the command exits non-zero when any non-skipped child ends `unresolved` or `pinned-mismatch`.
+- `record [paths…]` — write each present child's `remote.origin.url` and current branch into the registry.
+- `export [-o <file>] [--scan]` — serialize the registry to a manifest (stdout by default; `--scan` records first). The manifest must never be committed; when `-o` writes inside the worktree the filename is appended to `.git/info/exclude` as a courtesy.
+- `link <path> <url>` — clone a child into a missing or empty gitlink directory, stage the gitlink, and record its URL.
 
 ## Implementation notes
 
