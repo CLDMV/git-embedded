@@ -475,3 +475,21 @@ describe("git argument-injection + registry-key normalization (review round 5)",
 		expect(fs.existsSync(path.join(path.dirname(fresh), "escaped"))).toBe(false);
 	});
 });
+
+describe("filter-path normalization (review round 6)", () => {
+	it("--skip and paths filters accept './x', 'x/', and backslash spellings", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// skip spelled './tests' must actually skip (previously a silent no-match).
+		const skipped = api.embedded.restore({ cwd: fresh, skip: ["./tests"] });
+		expect(skipped.results[0].outcome).toBe("skipped");
+		expect(skipped.exitCode).toBe(0);
+		// paths filter spelled 'tests/' must select the gitlink (dry-run).
+		const wanted = api.embedded.restore({ cwd: fresh, paths: ["tests/"], dryRun: true });
+		expect(wanted.results).toHaveLength(1);
+		expect(wanted.results[0].outcome).toBe("restored");
+		// backslash spelling normalizes too.
+		const bs = api.embedded.restore({ cwd: fresh, skip: ["tests\\"], dryRun: true });
+		expect(bs.results[0].outcome).toBe("skipped");
+	});
+});

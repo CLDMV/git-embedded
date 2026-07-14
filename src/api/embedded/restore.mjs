@@ -51,8 +51,16 @@ export default function restore(opts = {}) {
 	const parentOrigin = git(["-C", root, "config", "--get", "remote.origin.url"]).stdout || null;
 	const manifest = from ? self.embedded.manifest.read(from, cwd) : null;
 
-	const skipSet = new Set(skip);
-	const wantSet = paths.length ? new Set(paths) : null;
+	// Gitlink paths from ls-tree are root-relative with forward slashes; accept
+	// the common user spellings of the same path ("./tests", "tests/", Windows
+	// "vendor\\foo") for --skip / path filters instead of silently not matching.
+	const normalizePath = (p) =>
+		String(p)
+			.replace(/\\/g, "/")
+			.replace(/^\.\/+/, "")
+			.replace(/\/+$/, "");
+	const skipSet = new Set(skip.map(normalizePath));
+	const wantSet = paths.length ? new Set(paths.map(normalizePath)) : null;
 
 	const links = self.embedded.gitlinks(root);
 	const results = [];
