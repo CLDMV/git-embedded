@@ -341,3 +341,57 @@ describe("target safety guards (review hardening)", () => {
 		expect(() => api.embedded.manifest.read(badVersion)).toThrow(/unsupported version 2/);
 	});
 });
+
+describe("review hardening round 2 (scp-root convention + symlink guards)", () => {
+	it("derives the convention sibling for a scp-style origin with no path component", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// Repo at the scp path root: no "/" in the origin — sibling lives after the last ":".
+		git(["remote", "set-url", "origin", "git@host.example:parent.git"], fresh);
+		const { results } = api.embedded.restore({ cwd: fresh, dryRun: true });
+		expect(results[0].source).toBe("convention");
+		expect(results[0].url).toBe("git@host.example:tests.git");
+	});
+
+	it("restore refuses a symlink at a gitlink path — even one pointing at an empty dir", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		const target = path.join(mkTmp(), "elsewhere");
+		fs.mkdirSync(target);
+		fs.rmdirSync(path.join(fresh, "tests"));
+		fs.symlinkSync(target, path.join(fresh, "tests"));
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved");
+		expect(results[0].note).toMatch(/symbolic link.*refusing/);
+		expect(exitCode).toBe(1);
+		// The symlink target stays untouched — nothing was cloned through it.
+		expect(fs.readdirSync(target)).toHaveLength(0);
+		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
+	});
+
+	it("restore refuses a BROKEN symlink at a gitlink path", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		fs.rmdirSync(path.join(fresh, "tests"));
+		fs.symlinkSync(path.join(fresh, "does-not-exist"), path.join(fresh, "tests"));
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved");
+		expect(results[0].note).toMatch(/symbolic link.*refusing/);
+		expect(exitCode).toBe(1);
+		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
+	});
+
+	it("link refuses a symlink target up-front with exit 2", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		process.chdir(fresh);
+		vi.spyOn(process, "exit").mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		const target = path.join(mkTmp(), "elsewhere2");
+		fs.mkdirSync(target);
+		fs.symlinkSync(target, path.join(fresh, "linked"));
+		expect(() => api.cli.link.run("linked", childBare)).toThrow(/process\.exit\(2\)/);
+		expect(fs.readdirSync(target)).toHaveLength(0);
+	});
+});

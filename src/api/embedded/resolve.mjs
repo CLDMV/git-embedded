@@ -17,8 +17,10 @@ function basename(childPath) {
  * parent's own repo name), and appends `<basename>.git`.
  *
  * Handles both scp-style (`git@host:org/parent.git`) and URL-style
- * (`https://host/org/parent.git`, `/srv/remotes/parent.git`) origins — the
- * split is purely on the last `/`, which is correct for all three.
+ * (`https://host/org/parent.git`, `/srv/remotes/parent.git`) origins: the split
+ * is on the last `/` when one exists; a scp-style origin whose repo sits at the
+ * path root (`git@host:parent.git`) has no `/`, so the sibling lives after the
+ * last `:` instead.
  *
  * @param {string|null} parentOrigin the parent's `remote.origin.url`
  * @param {string} childPath gitlink path
@@ -28,9 +30,10 @@ export function conventionUrl(parentOrigin, childPath) {
 	if (!parentOrigin) return null;
 	const trimmed = parentOrigin.replace(/\/+$/, "");
 	const idx = trimmed.lastIndexOf("/");
-	if (idx < 0) return null;
-	const dir = trimmed.slice(0, idx);
-	return `${dir}/${basename(childPath)}.git`;
+	if (idx >= 0) return `${trimmed.slice(0, idx)}/${basename(childPath)}.git`;
+	const colon = trimmed.lastIndexOf(":");
+	if (colon < 0) return null;
+	return `${trimmed.slice(0, colon)}:${basename(childPath)}.git`;
 }
 
 /**

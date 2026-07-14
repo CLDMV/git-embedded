@@ -15,30 +15,38 @@ export const spec = {
 };
 
 /**
- * Whether `dir` blocks a fresh clone. A missing path is fine, and an empty
- * directory is fine (a fresh clone of the parent materializes each gitlink as
- * an empty dir). A directory with contents, an existing repo, a FILE at the
- * path, or an unreadable directory — all refused.
- * @param {string} dir
+ * Whether the target path blocks a fresh clone. A missing path is fine, and an
+ * empty REAL directory is fine (a fresh clone of the parent materializes each
+ * gitlink as an empty dir). Everything else is refused: a directory with
+ * contents, an existing repo, a file, an unreadable directory, or a SYMLINK —
+ * even one pointing at an empty dir, since cloning through it would write
+ * outside the repo. lstat so links are seen (and broken links caught), never
+ * followed.
+ * @param {string} target
  * @returns {boolean}
  */
-function isNonEmpty(dir) {
+function blocksClone(target) {
 	const { fs } = context;
+	let st;
 	try {
-		return fs.readdirSync(dir).length > 0;
+		st = fs.lstatSync(target);
 	} catch (err) {
-		// A file (ENOTDIR) or an unreadable directory must be refused up-front —
-		// cloning into it fails confusingly (or worse). Only a missing path
-		// (ENOENT) is safe to treat as empty: git clone creates it.
+		// Only a missing path (ENOENT) is safe — git clone creates it.
 		return err.code !== "ENOENT";
+	}
+	if (st.isSymbolicLink() || !st.isDirectory()) return true;
+	try {
+		return fs.readdirSync(target).length > 0;
+	} catch {
+		return true; // unreadable directory
 	}
 }
 
 export function run(localPath, remoteUrl) {
-	const { fs, spawnSync } = context;
+	const { spawnSync } = context;
 
-	if (fs.existsSync(localPath) && isNonEmpty(localPath)) {
-		self.report.error(`${localPath} already exists and is not empty. Remove it or pick a different path before linking.`);
+	if (blocksClone(localPath)) {
+		self.report.error(`${localPath} exists and is not an empty directory. Remove it or pick a different path before linking.`);
 		process.exit(2);
 	}
 

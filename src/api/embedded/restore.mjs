@@ -74,16 +74,28 @@ export default function restore(opts = {}) {
 			continue;
 		}
 
-		// The only acceptable pre-existing target is an EMPTY directory — what a
-		// fresh parent clone materializes for a gitlink. A file, or a directory
-		// with contents, is user data: never clone into it, never remove it.
-		if (fs.existsSync(absChild)) {
+		// The only acceptable pre-existing target is an EMPTY, REAL directory —
+		// what a fresh parent clone materializes for a gitlink. A file, a
+		// directory with contents, or a SYMLINK (even to an empty dir — cloning
+		// through it would write outside the repo) is user data: never clone
+		// into it, never remove it. lstat so links are seen, not followed; this
+		// also catches a broken symlink, which existsSync would miss.
+		let targetStat = null;
+		try {
+			targetStat = fs.lstatSync(absChild);
+		} catch {
+			/* missing — clone will create it */
+		}
+		if (targetStat) {
 			let refuse = null;
-			try {
-				if (!fs.statSync(absChild).isDirectory()) refuse = "target exists and is not a directory";
-				else if (fs.readdirSync(absChild).length > 0) refuse = "target directory is not empty";
-			} catch (err) {
-				refuse = `target unreadable (${err.code || err.message})`;
+			if (targetStat.isSymbolicLink()) refuse = "target is a symbolic link";
+			else if (!targetStat.isDirectory()) refuse = "target exists and is not a directory";
+			else {
+				try {
+					if (fs.readdirSync(absChild).length > 0) refuse = "target directory is not empty";
+				} catch (err) {
+					refuse = `target unreadable (${err.code || err.message})`;
+				}
 			}
 			if (refuse) {
 				results.push({ ...record, outcome: "unresolved", note: `${refuse} — refusing to touch it` });
