@@ -430,3 +430,48 @@ describe("manifest shape hardening (review round 4)", () => {
 		expect(JSON.parse(JSON.stringify(manifest)).children["__proto__"].url).toBe("ssh://h/p.git");
 	});
 });
+
+describe("git argument-injection + registry-key normalization (review round 5)", () => {
+	it("a registry URL starting with '-' is passed as a repo, never a git option", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		const marker = path.join(mkTmp(), "pwned");
+		// Classic vector: without `--`, git clone would honor --upload-pack and run it.
+		api.embedded.registry.setUrl("tests", `--upload-pack=touch ${marker}`, fresh);
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved"); // clone failed cleanly
+		expect(exitCode).toBe(1);
+		expect(fs.existsSync(marker)).toBe(false); // nothing executed
+		expect(fs.existsSync(path.join(fresh, "tests", ".git"))).toBe(false);
+	});
+
+	it("link normalizes './tests' and 'tests/' to the gitlink path for the registry key", () => {
+		const a = makeParent({ gitlinkPath: "tests" });
+		const freshA = freshClone(a.parentBare);
+		process.chdir(freshA);
+		vi.spyOn(process, "exit").mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		api.cli.link.run("./tests", a.childBare);
+		expect(api.embedded.registry.getUrl("tests", freshA)).toBe(a.childBare);
+		expect(api.embedded.restore({ cwd: freshA }).results[0].outcome).toBe("already-present");
+		process.chdir(originalCwd);
+
+		const b = makeParent({ gitlinkPath: "tests" });
+		const freshB = freshClone(b.parentBare);
+		process.chdir(freshB);
+		api.cli.link.run("tests/", b.childBare);
+		expect(api.embedded.registry.getUrl("tests", freshB)).toBe(b.childBare);
+	});
+
+	it("link refuses a target outside the repository worktree", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		process.chdir(fresh);
+		vi.spyOn(process, "exit").mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		expect(() => api.cli.link.run("../escaped", childBare)).toThrow(/process\.exit\(2\)/);
+		expect(fs.existsSync(path.join(path.dirname(fresh), "escaped"))).toBe(false);
+	});
+});

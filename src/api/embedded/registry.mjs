@@ -45,7 +45,8 @@ export function getBranch(childPath, cwd = process.cwd()) {
  * @returns {boolean} true on success
  */
 export function setUrl(childPath, url, cwd = process.cwd()) {
-	return git(["config", "--local", `embedded.${childPath}.url`, url], { cwd }).code === 0;
+	// `--` so a value starting with "-" is never parsed as a git option.
+	return git(["config", "--local", "--", `embedded.${childPath}.url`, url], { cwd }).code === 0;
 }
 
 /**
@@ -56,7 +57,7 @@ export function setUrl(childPath, url, cwd = process.cwd()) {
  * @returns {boolean} true on success
  */
 export function setBranch(childPath, branch, cwd = process.cwd()) {
-	return git(["config", "--local", `embedded.${childPath}.branch`, branch], { cwd }).code === 0;
+	return git(["config", "--local", "--", `embedded.${childPath}.branch`, branch], { cwd }).code === 0;
 }
 
 /**

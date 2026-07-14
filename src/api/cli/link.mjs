@@ -43,32 +43,44 @@ function blocksClone(target) {
 }
 
 export function run(localPath, remoteUrl) {
-	const { spawnSync } = context;
+	const { spawnSync, path } = context;
+
+	// Normalize to the repo-root-relative, slash-normalized gitlink path — the
+	// key restore/gitlinks/export all use. "./tests" or "tests/" must record as
+	// "tests", and a target outside the worktree is refused outright.
+	const root = self.git.getRepoRoot() || process.cwd();
+	const rel = path.relative(root, path.resolve(process.cwd(), localPath)).split(path.sep).join("/");
+	if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+		self.report.error(`${localPath} is outside the repository worktree — link inside the parent repo.`);
+		process.exit(2);
+	}
 
 	if (blocksClone(localPath)) {
 		self.report.error(`${localPath} exists and is not an empty directory. Remove it or pick a different path before linking.`);
 		process.exit(2);
 	}
 
-	self.report.plain(`Cloning ${remoteUrl} into ${localPath}…`);
-	const clone = spawnSync("git", ["clone", remoteUrl, localPath], { stdio: "inherit" });
+	self.report.plain(`Cloning ${remoteUrl} into ${rel}…`);
+	// `--` ends option parsing: a URL or path starting with "-" must never be
+	// interpreted as a git option (e.g. --upload-pack).
+	const clone = spawnSync("git", ["clone", "--", remoteUrl, localPath], { stdio: "inherit" });
 	if (clone.status !== 0) {
 		self.report.error(`git clone exited with status ${clone.status}`);
 		process.exit(clone.status || 1);
 	}
 
-	const add = spawnSync("git", ["add", localPath], { stdio: "inherit" });
+	const add = spawnSync("git", ["add", "--", localPath], { stdio: "inherit" });
 	if (add.status !== 0) {
 		self.report.error(`git add ${localPath} exited with status ${add.status}`);
 		process.exit(add.status || 1);
 	}
 
 	// Record the URL + branch into the parent's LOCAL config registry (never
-	// committed) so a later restore/export already knows this child.
-	const root = self.git.getRepoRoot() || process.cwd();
-	self.embedded.registry.recordOne(localPath, root);
+	// committed) so a later restore/export already knows this child — keyed by
+	// the NORMALIZED gitlink path so day-2 restore/export find it.
+	self.embedded.registry.recordOne(rel, root);
 
-	self.report.success(`Staged gitlink at ${localPath} (no .gitmodules entry written).`);
+	self.report.success(`Staged gitlink at ${rel} (no .gitmodules entry written).`);
 	self.report.plain("Commit when ready: git commit -m 'embed <name>'");
 }
 

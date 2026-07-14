@@ -117,7 +117,9 @@ export default function restore(opts = {}) {
 		}
 
 		const existedBefore = fs.existsSync(absChild);
-		const clone = git(["clone", "--quiet", resolved.url, absChild]);
+		// `--` ends option parsing: a URL from config/manifest/--base that starts
+		// with "-" must never be interpreted as a git option (e.g. --upload-pack).
+		const clone = git(["clone", "--quiet", "--", resolved.url, absChild]);
 		if (clone.code !== 0) {
 			if (fs.existsSync(absChild)) removeClone(absChild, existedBefore);
 			results.push({ ...record, outcome: "unresolved", note: `clone failed: ${clone.stderr || `exit ${clone.code}`}` });
