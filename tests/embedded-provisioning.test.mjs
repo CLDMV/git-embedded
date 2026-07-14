@@ -13,6 +13,20 @@ function mkTmp() {
 	return dir;
 }
 
+// Whether this environment can CREATE symlinks — Windows requires Developer
+// Mode or elevation. The symlink-guard cases skip where creation is denied;
+// the guards themselves need no symlink rights and stay exercised on POSIX CI.
+const canSymlink = (() => {
+	try {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "git-embedded-symlink-probe-"));
+		fs.symlinkSync(dir, path.join(dir, "probe"), "dir");
+		fs.rmSync(dir, { recursive: true, force: true });
+		return true;
+	} catch {
+		return false;
+	}
+})();
+
 function git(args, cwd) {
 	const res = spawnSync("git", args, { cwd, encoding: "utf8" });
 	if (res.status !== 0) throw new Error(`git ${args.join(" ")} (cwd=${cwd}) failed: ${res.stderr || res.stdout}`);
@@ -353,13 +367,13 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		expect(results[0].url).toBe("git@host.example:tests.git");
 	});
 
-	it("restore refuses a symlink at a gitlink path — even one pointing at an empty dir", () => {
+	it.skipIf(!canSymlink)("restore refuses a symlink at a gitlink path — even one pointing at an empty dir", () => {
 		const { parentBare } = makeParent({ gitlinkPath: "tests" });
 		const fresh = freshClone(parentBare);
 		const target = path.join(mkTmp(), "elsewhere");
 		fs.mkdirSync(target);
 		fs.rmdirSync(path.join(fresh, "tests"));
-		fs.symlinkSync(target, path.join(fresh, "tests"));
+		fs.symlinkSync(target, path.join(fresh, "tests"), "dir");
 		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
 		expect(results[0].outcome).toBe("unresolved");
 		expect(results[0].note).toMatch(/symbolic link.*refusing/);
@@ -369,11 +383,11 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
 	});
 
-	it("restore refuses a BROKEN symlink at a gitlink path", () => {
+	it.skipIf(!canSymlink)("restore refuses a BROKEN symlink at a gitlink path", () => {
 		const { parentBare } = makeParent({ gitlinkPath: "tests" });
 		const fresh = freshClone(parentBare);
 		fs.rmdirSync(path.join(fresh, "tests"));
-		fs.symlinkSync(path.join(fresh, "does-not-exist"), path.join(fresh, "tests"));
+		fs.symlinkSync(path.join(fresh, "does-not-exist"), path.join(fresh, "tests"), "dir");
 		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
 		expect(results[0].outcome).toBe("unresolved");
 		expect(results[0].note).toMatch(/symbolic link.*refusing/);
@@ -381,7 +395,7 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
 	});
 
-	it("link refuses a symlink target up-front with exit 2", () => {
+	it.skipIf(!canSymlink)("link refuses a symlink target up-front with exit 2", () => {
 		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
 		const fresh = freshClone(parentBare);
 		process.chdir(fresh);
@@ -390,7 +404,7 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		});
 		const target = path.join(mkTmp(), "elsewhere2");
 		fs.mkdirSync(target);
-		fs.symlinkSync(target, path.join(fresh, "linked"));
+		fs.symlinkSync(target, path.join(fresh, "linked"), "dir");
 		expect(() => api.cli.link.run("linked", childBare)).toThrow(/process\.exit\(2\)/);
 		expect(fs.readdirSync(target)).toHaveLength(0);
 	});
