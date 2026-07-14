@@ -29,8 +29,8 @@ export function read(file, cwd = process.cwd()) {
 	} catch (err) {
 		throw new Error(`manifest ${abs} is not valid JSON: ${err.message}`);
 	}
-	if (!obj || typeof obj !== "object" || typeof obj.children !== "object" || obj.children === null) {
-		throw new Error(`manifest ${abs} is missing a "children" object`);
+	if (!obj || typeof obj !== "object" || typeof obj.children !== "object" || obj.children === null || Array.isArray(obj.children)) {
+		throw new Error(`manifest ${abs} is missing a "children" object (a path → { url, branch } map, not an array)`);
 	}
 	// Gate the format version so an incompatible manifest fails loudly at read
 	// time instead of producing hard-to-diagnose behavior downstream.
@@ -47,7 +47,9 @@ export function read(file, cwd = process.cwd()) {
  *   without a URL are dropped (a manifest without a URL is useless)
  */
 export function build(entries) {
-	const children = {};
+	// Null-prototype map: a child path named __proto__ must become a plain own
+	// key, never a prototype mutation.
+	const children = Object.create(null);
 	for (const e of entries || []) {
 		if (!e || !e.url) continue;
 		children[e.path] = { url: e.url };

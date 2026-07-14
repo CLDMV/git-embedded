@@ -66,7 +66,10 @@ export default function resolve(childPath, opts = {}) {
 	if (cfgUrl) return { url: cfgUrl, source: "local-config" };
 
 	// 2. Manifest file (transfer format, carried out-of-band via --from).
-	const child = manifest && manifest.children ? manifest.children[childPath] : null;
+	// Own properties only — direct indexing could read inherited keys (e.g. a
+	// path named "constructor"), and Object.hasOwn also behaves correctly for
+	// null-prototype children maps.
+	const child = manifest && manifest.children && Object.hasOwn(manifest.children, childPath) ? manifest.children[childPath] : null;
 	if (child && child.url) return { url: child.url, source: "manifest" };
 
 	// 3. Explicit --base + basename.

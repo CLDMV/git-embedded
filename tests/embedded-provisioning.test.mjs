@@ -17,13 +17,17 @@ function mkTmp() {
 // Mode or elevation. The symlink-guard cases skip where creation is denied;
 // the guards themselves need no symlink rights and stay exercised on POSIX CI.
 const canSymlink = (() => {
+	let dir = null;
 	try {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "git-embedded-symlink-probe-"));
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), "git-embedded-symlink-probe-"));
 		fs.symlinkSync(dir, path.join(dir, "probe"), "dir");
-		fs.rmSync(dir, { recursive: true, force: true });
 		return true;
 	} catch {
 		return false;
+	} finally {
+		// Clean up on BOTH paths — a failed probe (Windows without Developer
+		// Mode) must not leak the temp dir.
+		if (dir) fs.rmSync(dir, { recursive: true, force: true });
 	}
 })();
 
@@ -407,5 +411,22 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		fs.symlinkSync(target, path.join(fresh, "linked"), "dir");
 		expect(() => api.cli.link.run("linked", childBare)).toThrow(/process\.exit\(2\)/);
 		expect(fs.readdirSync(target)).toHaveLength(0);
+	});
+});
+
+describe("manifest shape hardening (review round 4)", () => {
+	it("read rejects an array children value", () => {
+		const dir = mkTmp();
+		const f = path.join(dir, "array-children.json");
+		fs.writeFileSync(f, JSON.stringify({ version: 1, children: [] }));
+		expect(() => api.embedded.manifest.read(f)).toThrow(/children/);
+	});
+
+	it("build treats a __proto__ child path as a plain key without polluting prototypes", () => {
+		const manifest = api.embedded.manifest.build([{ path: "__proto__", url: "ssh://h/p.git" }]);
+		expect(Object.hasOwn(manifest.children, "__proto__")).toBe(true);
+		expect({}.url).toBeUndefined(); // Object.prototype untouched
+		// Round-trips through JSON as an ordinary key.
+		expect(JSON.parse(JSON.stringify(manifest)).children["__proto__"].url).toBe("ssh://h/p.git");
 	});
 });

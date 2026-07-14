@@ -86,7 +86,7 @@ git config advice.addEmbeddedRepo false
 
 The committed parent tree now contains a gitlink at `embedded-child` pinning the child's current HEAD. No `.gitmodules` is created; the child's URL never lands in the public repo.
 
-`link` clones into a missing **or empty** target directory (a fresh clone of a parent materializes each gitlink as an empty dir, so `link` works to fill one in); it refuses only a non-empty directory. After staging, it also records the child's URL and branch into this clone's local registry (see below).
+`link` clones into a missing **or empty** target directory (a fresh clone of a parent materializes each gitlink as an empty dir, so `link` works to fill one in); it refuses anything else — a non-empty directory, a file, a symlink (even to an empty dir), or an unreadable path. After staging, it also records the child's URL and branch into this clone's local registry (see below).
 
 ## Restoring embedded children (machine-B bootstrap)
 
