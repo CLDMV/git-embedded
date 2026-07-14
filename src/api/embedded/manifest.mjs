@@ -32,6 +32,11 @@ export function read(file, cwd = process.cwd()) {
 	if (!obj || typeof obj !== "object" || typeof obj.children !== "object" || obj.children === null) {
 		throw new Error(`manifest ${abs} is missing a "children" object`);
 	}
+	// Gate the format version so an incompatible manifest fails loudly at read
+	// time instead of producing hard-to-diagnose behavior downstream.
+	if (obj.version !== 1) {
+		throw new Error(`manifest ${abs} has unsupported version ${JSON.stringify(obj.version)} (expected 1)`);
+	}
 	return obj;
 }
 

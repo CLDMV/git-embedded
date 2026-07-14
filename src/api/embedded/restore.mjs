@@ -74,6 +74,23 @@ export default function restore(opts = {}) {
 			continue;
 		}
 
+		// The only acceptable pre-existing target is an EMPTY directory — what a
+		// fresh parent clone materializes for a gitlink. A file, or a directory
+		// with contents, is user data: never clone into it, never remove it.
+		if (fs.existsSync(absChild)) {
+			let refuse = null;
+			try {
+				if (!fs.statSync(absChild).isDirectory()) refuse = "target exists and is not a directory";
+				else if (fs.readdirSync(absChild).length > 0) refuse = "target directory is not empty";
+			} catch (err) {
+				refuse = `target unreadable (${err.code || err.message})`;
+			}
+			if (refuse) {
+				results.push({ ...record, outcome: "unresolved", note: `${refuse} — refusing to touch it` });
+				continue;
+			}
+		}
+
 		const resolved = self.embedded.resolve(childPath, { cwd: root, manifest, base, parentOrigin });
 		record.url = resolved.url;
 		record.source = resolved.source;

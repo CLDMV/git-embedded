@@ -17,7 +17,8 @@ export const spec = {
 /**
  * Whether `dir` blocks a fresh clone. A missing path is fine, and an empty
  * directory is fine (a fresh clone of the parent materializes each gitlink as
- * an empty dir). A directory with contents — or an existing repo — is refused.
+ * an empty dir). A directory with contents, an existing repo, a FILE at the
+ * path, or an unreadable directory — all refused.
  * @param {string} dir
  * @returns {boolean}
  */
@@ -25,8 +26,11 @@ function isNonEmpty(dir) {
 	const { fs } = context;
 	try {
 		return fs.readdirSync(dir).length > 0;
-	} catch {
-		return false;
+	} catch (err) {
+		// A file (ENOTDIR) or an unreadable directory must be refused up-front —
+		// cloning into it fails confusingly (or worse). Only a missing path
+		// (ENOENT) is safe to treat as empty: git clone creates it.
+		return err.code !== "ENOENT";
 	}
 }
 

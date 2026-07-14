@@ -292,3 +292,52 @@ describe("api.cli.link (empty-dir fix)", () => {
 		expect(() => api.cli.link.run("vendor", childBare)).toThrow(/process\.exit\(2\)/);
 	});
 });
+
+describe("target safety guards (review hardening)", () => {
+	it("restore refuses a non-empty directory at a gitlink path and leaves it untouched", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// User data sitting in the materialized gitlink dir must never be touched.
+		fs.writeFileSync(path.join(fresh, "tests", "precious.txt"), "user data");
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved");
+		expect(results[0].note).toMatch(/not empty.*refusing/);
+		expect(exitCode).toBe(1);
+		expect(fs.readFileSync(path.join(fresh, "tests", "precious.txt"), "utf8")).toBe("user data");
+		expect(fs.existsSync(path.join(fresh, "tests", ".git"))).toBe(false);
+	});
+
+	it("restore refuses a file at a gitlink path and leaves it untouched", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		fs.rmdirSync(path.join(fresh, "tests"));
+		fs.writeFileSync(path.join(fresh, "tests"), "a file, not a dir");
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved");
+		expect(results[0].note).toMatch(/not a directory.*refusing/);
+		expect(exitCode).toBe(1);
+		expect(fs.readFileSync(path.join(fresh, "tests"), "utf8")).toBe("a file, not a dir");
+	});
+
+	it("link refuses a file target up-front with exit 2", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		process.chdir(fresh);
+		vi.spyOn(process, "exit").mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		fs.writeFileSync(path.join(fresh, "somefile"), "x");
+		expect(() => api.cli.link.run("somefile", childBare)).toThrow(/process\.exit\(2\)/);
+		expect(fs.readFileSync(path.join(fresh, "somefile"), "utf8")).toBe("x");
+	});
+
+	it("manifest.read rejects a missing or unsupported version", () => {
+		const dir = mkTmp();
+		const noVersion = path.join(dir, "no-version.json");
+		fs.writeFileSync(noVersion, JSON.stringify({ children: {} }));
+		expect(() => api.embedded.manifest.read(noVersion)).toThrow(/version/);
+		const badVersion = path.join(dir, "bad-version.json");
+		fs.writeFileSync(badVersion, JSON.stringify({ version: 2, children: {} }));
+		expect(() => api.embedded.manifest.read(badVersion)).toThrow(/unsupported version 2/);
+	});
+});
