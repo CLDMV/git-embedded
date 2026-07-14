@@ -58,10 +58,16 @@ export function run(paths = [], opts = {}) {
 		else self.report.warn(line);
 	}
 
+	// Count each outcome into exactly one bucket — "unchanged" is only
+	// already-present, never a failure or a skip counted twice.
 	const restored = results.filter((r) => r.outcome === "restored").length;
+	const unchanged = results.filter((r) => r.outcome === "already-present").length;
+	const skipped = results.filter((r) => r.outcome === "skipped").length;
 	const failed = results.filter((r) => r.outcome === "unresolved" || r.outcome === "pinned-mismatch").length;
 	self.report.plain("");
-	self.report.plain(`${restored} ${opts.dryRun ? "resolvable" : "restored"}, ${results.length - restored} unchanged, ${failed} failed.`);
+	self.report.plain(
+		`${restored} ${opts.dryRun ? "resolvable" : "restored"}, ${unchanged} unchanged${skipped ? `, ${skipped} skipped` : ""}, ${failed} failed.`
+	);
 	process.exit(exitCode);
 }
 

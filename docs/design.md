@@ -19,7 +19,7 @@ The hooks in this package close the registration gap without requiring a registr
 
 ## Why this matters: the URL is the leak
 
-For most submodule use cases, the URL in `.gitmodules` is uncontroversial — the parent is open and the child is open, the URL is just a convenience for `clone --recurse-submodules`. For a parent that wants to hide the *existence* of a private child repo, the `.gitmodules` URL is the leak. Anyone who can read the public parent can read `.gitmodules`, see the URL of the private child, and at minimum learn that a private resource exists at that location.
+For most submodule use cases, the URL in `.gitmodules` is uncontroversial — the parent is open and the child is open, the URL is just a convenience for `clone --recurse-submodules`. For a parent that wants to hide the _existence_ of a private child repo, the `.gitmodules` URL is the leak. Anyone who can read the public parent can read `.gitmodules`, see the URL of the private child, and at minimum learn that a private resource exists at that location.
 
 Avoiding `.gitmodules` is the obvious fix, but doing so loses the working-tree automation. This package restores the automation while keeping the parent free of URL data.
 
@@ -80,64 +80,63 @@ The detached-HEAD checkout matches standard submodule behavior: parents pin spec
 
 ## Coverage matrix
 
-| Operation | `reference-transaction` (guard) | `update-embedded-repos` (update) |
-|---|---|---|
-| `git checkout <ref>` | Refuses if any child is dirty | Updates children to new pins |
-| `git switch <branch>` | Refuses if any child is dirty | Updates children to new pins |
-| `git reset --hard <commit>` | Refuses if any child is dirty | **Gap** — does not fire `post-*` hooks |
+| Operation                           | `reference-transaction` (guard)            | `update-embedded-repos` (update)                |
+| ----------------------------------- | ------------------------------------------ | ----------------------------------------------- |
+| `git checkout <ref>`                | Refuses if any child is dirty              | Updates children to new pins                    |
+| `git switch <branch>`               | Refuses if any child is dirty              | Updates children to new pins                    |
+| `git reset --hard <commit>`         | Refuses if any child is dirty              | **Gap** — does not fire `post-*` hooks          |
 | `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves) | Does not fire `post-*` hooks (HEAD-only change) |
-| `git pull` (fast-forward) | Refuses if any child is dirty | Updates children |
-| `git pull --rebase` | Refuses at each rebase step | Updates children after rebase completes |
-| `git merge <commit>` | Refuses if any child is dirty | Updates children via `post-merge` |
-| `git rebase` | Refuses at each step | Updates children via `post-rewrite` |
-| `git bisect <good/bad/run>` | Refuses if any child is dirty | Updates children at each bisect step |
-| `git cherry-pick` | Refuses if any child is dirty | Updates children via `post-checkout` |
-| `git stash pop` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
-| `git commit` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
-| `git checkout -- file` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
+| `git pull` (fast-forward)           | Refuses if any child is dirty              | Updates children                                |
+| `git pull --rebase`                 | Refuses at each rebase step                | Updates children after rebase completes         |
+| `git merge <commit>`                | Refuses if any child is dirty              | Updates children via `post-merge`               |
+| `git rebase`                        | Refuses at each step                       | Updates children via `post-rewrite`             |
+| `git bisect <good/bad/run>`         | Refuses if any child is dirty              | Updates children at each bisect step            |
+| `git cherry-pick`                   | Refuses if any child is dirty              | Updates children via `post-checkout`            |
+| `git stash pop`                     | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
+| `git commit`                        | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
+| `git checkout -- file`              | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
 
 ## Comparison to standard submodules
 
-| Property | Standard submodule | Anonymous gitlink + these hooks |
-|---|---|---|
-| Child URL in parent | Yes, in `.gitmodules` | No |
-| Tree-level pin | Gitlink | Gitlink |
-| Public viewer sees | URL, path, current SHA | Just the SHA (no link to follow) |
-| `git submodule update` | Works | Not used (registry-bound; hooks replace it) |
-| `submodule.recurse=true` | Works | Not used (registry-bound; hooks replace it) |
-| `git status` divergence | Yes | Yes |
-| `git add path` infers SHA | Yes | Yes |
-| `--recurse-submodules` clone | Pulls child | No-op (no registry) |
-| Initial child clone | Automatic via registry | `git embedded restore` (SHA-verified; see [Provisioning](#provisioning-restoring-embedded-children)) |
-| Dirty-child guard | Default refuses on update | Hook refuses on the HEAD move itself |
+| Property                     | Standard submodule        | Anonymous gitlink + these hooks                                                                      |
+| ---------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Child URL in parent          | Yes, in `.gitmodules`     | No                                                                                                   |
+| Tree-level pin               | Gitlink                   | Gitlink                                                                                              |
+| Public viewer sees           | URL, path, current SHA    | Just the SHA (no link to follow)                                                                     |
+| `git submodule update`       | Works                     | Not used (registry-bound; hooks replace it)                                                          |
+| `submodule.recurse=true`     | Works                     | Not used (registry-bound; hooks replace it)                                                          |
+| `git status` divergence      | Yes                       | Yes                                                                                                  |
+| `git add path` infers SHA    | Yes                       | Yes                                                                                                  |
+| `--recurse-submodules` clone | Pulls child               | No-op (no registry)                                                                                  |
+| Initial child clone          | Automatic via registry    | `git embedded restore` (SHA-verified; see [Provisioning](#provisioning-restoring-embedded-children)) |
+| Dirty-child guard            | Default refuses on update | Hook refuses on the HEAD move itself                                                                 |
 
 The most useful difference is the **guard timing**. Standard submodules let the parent operation proceed and then refuse the child update, leaving the developer in a parent-moved-child-stale state that has to be backed out. The `reference-transaction` guard refuses the whole transaction at the parent level, so the working tree never reaches the inconsistent state.
 
 ## Provisioning: restoring embedded children
 
-The hooks above keep an *already-cloned* child in sync with the parent's pin. They do not perform the *initial* clone, because the parent tree deliberately records no URL to clone from. Standard submodules get the initial clone from the `.gitmodules` registry; anonymous gitlinks need another way to answer "where does this child come from?" without committing the answer.
+The hooks above keep an _already-cloned_ child in sync with the parent's pin. They do not perform the _initial_ clone, because the parent tree deliberately records no URL to clone from. Standard submodules get the initial clone from the `.gitmodules` registry; anonymous gitlinks need another way to answer "where does this child come from?" without committing the answer.
 
 `git embedded restore` is that mechanism. It enumerates the gitlinks in HEAD (the same `git ls-tree -r HEAD`, mode-`160000` walk the hooks use) and, for every child that is missing, empty, or lacks a `.git`, resolves a clone URL, clones, verifies, and checks out the pin. The design's core property holds throughout: child URLs are never committed.
 
-### URL knowledge lives in three optional layers
+### URL knowledge lives in four optional sources
 
-URL knowledge is never in the committed tree. It can only come from one of three optional layers, tried strictest-first at resolve time:
+URL knowledge is never in the committed tree. It can only come from one of four optional sources, tried strictest-first at resolve time:
 
 1. **Local config registry** — `embedded.<path>.url` / `embedded.<path>.branch` in the parent clone's `.git/config`. Per-clone, never committed, never leaves the machine that wrote it. This is the durable record: a successful restore writes it, as do `record` and `link`.
 2. **Manifest** — a JSON transfer file (`{ "version": 1, "children": { "<path>": { "url": …, "branch": … } } }`) passed via `--from`. It is a transfer format only: it lives outside any repo, in the operator's hands, and is never committed. `export` produces it from the registry; `restore --from` consumes it.
-3. **Convention** — with zero recorded state, the child is assumed to be a sibling of wherever the parent was cloned from: `dirname(parent remote.origin.url) + "/" + basename(<path>) + ".git"`.
-
-`--base <url-base>` sits between the manifest and convention as an explicit one-off override (`<url-base>/<basename>.git`), useful when children live under a known base that differs from the parent's origin.
+3. **Explicit base** — `--base <url-base>` derives `<url-base>/<basename>.git`; a per-invocation override for children living under a known base that differs from the parent's origin. Supplied on the command line, recorded nowhere.
+4. **Convention** — with zero supplied state, the child is assumed to be a sibling of wherever the parent was cloned from: `dirname(parent remote.origin.url) + "/" + basename(<path>) + ".git"`.
 
 ### Why convention discloses nothing
 
-The convention layer looks like it might leak, but it cannot reveal anything not already implied by the committed tree. The gitlink path (e.g. `tests`) and the parent's own origin are both already visible to anyone who has the parent. Convention only *combines* them into a guess — it invents no new information — and because the guess is a guess, it is not trusted. It is SHA-verified.
+The convention layer looks like it might leak, but it cannot reveal anything not already implied by the committed tree. The gitlink path (e.g. `tests`) and the parent's own origin are both already visible to anyone who has the parent. Convention only _combines_ them into a guess — it invents no new information — and because the guess is a guess, it is not trusted. It is SHA-verified.
 
 ### SHA verification makes wrong guesses fail closed
 
 After every clone, the parent's pinned SHA must exist in the cloned child (`git cat-file -e <sha>^{commit}`, retried once after a `git fetch origin`). If it is absent, the clone `restore` created is removed — never a pre-existing directory — and the child is reported `pinned-mismatch` with a non-zero exit. A convention guess that resolves to the wrong repository (or an out-of-date one) therefore fails closed rather than silently planting unrelated code at the pinned path. Only a repository that actually contains the pinned commit is accepted.
 
-An *obscured* child — one whose repository name does not match its gitlink path — is by construction not convention-resolvable, which is exactly the property that keeps a private child hidden. Such a child is reachable only through layer 1 or layer 2: someone with access records its URL (via `link` or `record`) or is handed a manifest. A public cloner without either simply `--skip`s it; partial restore is the expected outcome, not an error.
+An _obscured_ child — one whose repository name does not match its gitlink path — is by construction not convention-resolvable, which is exactly the property that keeps a private child hidden. Such a child is reachable only through layer 1 or layer 2: someone with access records its URL (via `link` or `record`) or is handed a manifest. A public cloner without either simply `--skip`s it; partial restore is the expected outcome, not an error.
 
 ### The commands
 
