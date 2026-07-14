@@ -43,6 +43,17 @@ git embedded install-hooks   # install hooks into this repo's .git/hooks
 git embedded uninstall-hooks # remove hooks installed by this CLI
 ```
 
+### Guard behavior (config knobs)
+
+The installed hooks read two settings (`git config`, local overrides global; one-shot override with `git -c <key>=<value> <command>`):
+
+| Key                    | Values                        | Default   | What it controls                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `embedded.guard`       | `precise` · `strict` · `off`  | `precise` | When HEAD moves are blocked. `precise` blocks only a move that would re-pin a child with uncommitted changes. `strict` is the everything-synced policy: any dirty child blocks any move, and a parent commit is refused while any child's pin is stale (child HEAD not recorded) — for workspaces where the parent must always snapshot a fully-committed, fully-recorded state. |
+| `embedded.pushRecurse` | `check` · `on-demand` · `off` | `check`   | Whether a parent push verifies that newly-pinned child commits are reachable from each child's origin. `check` rejects with a "push the child first" message; `on-demand` tries pushing the child's current branch first. Prevents publishing a parent whose pins dangle for every other machine.                                                                                |
+
+Two-part keys like these can never collide with the per-child registry entries (`embedded.<path>.url` / `.branch`), which are always three-part.
+
 `install-hooks` adapts to whatever's already in place:
 
 - **Nothing configured** — offers to install a small dispatcher script at `~/.config/git/hooks/_dispatch`, link every standard hook name to it, and set `git config --global core.hooksPath` to that directory. Then drops this package's hook scripts into the repo's `.git/hooks/`. The dispatcher chains to per-repo hooks, so every other repo on the machine keeps working as before.

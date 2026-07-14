@@ -77,7 +77,7 @@ describe("api.install.hooks", () => {
 		await api.install.hooks("install", gitDir);
 		const entries = await api.log.read();
 		const ours = entries.filter((e) => e.op === "install-repo-hook" && e.path.startsWith(gitDir));
-		expect(ours.length).toBe(4);
+		expect(ours.length).toBe(5);
 		expect(fs.existsSync(api.log.path())).toBe(true);
 	});
 });

@@ -6,6 +6,7 @@ const NAME_TO_SOURCE = {
 	"post-rewrite": "update-embedded-repos",
 	"reference-transaction": "reference-transaction",
 	"update-embedded-repos": "update-embedded-repos",
+	"pre-push": "pre-push",
 	_dispatch: "_dispatch.template",
 	dispatcher: "_dispatch.template"
 };

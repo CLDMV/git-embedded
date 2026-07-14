@@ -4,13 +4,14 @@ export const PACKAGE_HOOK_MAP = {
 	"post-checkout": "update-embedded-repos",
 	"post-merge": "update-embedded-repos",
 	"post-rewrite": "update-embedded-repos",
-	"reference-transaction": "reference-transaction"
+	"reference-transaction": "reference-transaction",
+	"pre-push": "pre-push"
 };
 
 /**
  * Install or uninstall the package's per-repo hook scripts.
  *
- * `op === "install"` copies the four hooks; `op === "uninstall"` removes only
+ * `op === "install"` copies the package hooks; `op === "uninstall"` removes only
  * the ones recognizably owned by git-embedded (any file whose content includes
  * the string "git-embedded").
  *
