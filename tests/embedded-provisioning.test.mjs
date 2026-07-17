@@ -91,6 +91,31 @@ function freshClone(parentBare) {
 	return dir;
 }
 
+/**
+ * Advance the child source repo by one commit. Pushed to the bare's `main` by
+ * default; `push: false` creates a commit that exists NOWHERE the child clone
+ * can fetch from (the missing-pin case). Returns the new SHA.
+ */
+function advanceChild(work, bareName, marker, { push = true } = {}) {
+	const src = path.join(work, `src-${bareName}`);
+	fs.writeFileSync(path.join(src, "next.txt"), marker);
+	git(["add", "."], src);
+	git(["commit", "-m", `${bareName} advance`], src);
+	if (push) git(["push", "origin", "main"], src);
+	return git(["rev-parse", "HEAD"], src);
+}
+
+/**
+ * Move the parent's gitlink pin to `sha` without touching the child on disk —
+ * exactly the state a `git pull` of new parent commits leaves behind.
+ * `--cacheinfo` records the gitlink straight into the index, so the pinned
+ * commit need not exist locally.
+ */
+function bumpPin(parentDir, childPath, sha) {
+	git(["update-index", "--cacheinfo", `160000,${sha},${childPath}`], parentDir);
+	git(["commit", "-m", `bump ${childPath} pin`], parentDir);
+}
+
 let originalEnv;
 let originalCwd;
 
@@ -473,6 +498,254 @@ describe("git argument-injection + registry-key normalization (review round 5)",
 		});
 		expect(() => api.cli.link.run("../escaped", childBare)).toThrow(/process\.exit\(2\)/);
 		expect(fs.existsSync(path.join(path.dirname(fresh), "escaped"))).toBe(false);
+	});
+});
+
+describe("branch-aware restore", () => {
+	it("puts the child ON the unique containing branch, sets upstream, and auto-registers it", () => {
+		const { parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("restored");
+		expect(results[0].branch).toBe("main");
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha);
+		expect(git(["branch", "--show-current"], child)).toBe("main");
+		expect(git(["rev-parse", "--abbrev-ref", "main@{upstream}"], child)).toBe("origin/main");
+		// Auto-registered like the URL, so day-2 sync knows the child's branch.
+		expect(api.embedded.registry.getBranch("tests", fresh)).toBe("main");
+	});
+
+	it("stays detached when the pin is on more than one remote branch (ambiguous)", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		// A second remote branch containing the same pin → inference must decline.
+		git(["push", "origin", "main:dev"], path.join(work, "src-tests"));
+		const fresh = freshClone(parentBare);
+
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("restored");
+		expect(results[0].branch).toBeNull();
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha);
+		expect(git(["branch", "--show-current"], child)).toBe(""); // detached
+		expect(api.embedded.registry.getBranch("tests", fresh)).toBeNull();
+	});
+
+	it("infer is not poisoned by origin/HEAD (full-refname regression)", () => {
+		const { work, childBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const clone = path.join(work, "infer-clone");
+		git(["clone", "--quiet", childBare, clone]);
+		git(["remote", "set-head", "origin", "--auto"], clone);
+		// Precondition: origin/HEAD is set — with short refnames it would list as
+		// bare "origin" and fake a second candidate, breaking uniqueness.
+		expect(git(["symbolic-ref", "refs/remotes/origin/HEAD"], clone)).toBe("refs/remotes/origin/main");
+		expect(api.embedded.branch.infer(clone, childSha)).toBe("main");
+	});
+
+	it("a registered branch beats inference (and survives a missing remote branch)", () => {
+		const { parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// Inference alone would pick "main"; the registry says otherwise.
+		api.embedded.registry.setBranch("tests", "pinned-work", fresh);
+
+		const { results } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("restored");
+		expect(results[0].branch).toBe("pinned-work");
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha);
+		expect(git(["branch", "--show-current"], child)).toBe("pinned-work");
+		// No origin/pinned-work exists — upstream is best-effort, not a failure.
+		expect(api.embedded.registry.getBranch("tests", fresh)).toBe("pinned-work");
+	});
+
+	it("round-trips the branch record → export → restore --from on a second machine", () => {
+		// Obscured name (no convention) + ambiguous inference (two branches carry
+		// the pin): only the manifest can supply BOTH the URL and the branch.
+		const { work, parentBare, childBare, childSha } = makeParent({ gitlinkPath: "tests", childBareName: "secret-xyz" });
+		git(["push", "origin", "main:dev"], path.join(work, "src-secret-xyz"));
+
+		// Machine A: link records url + branch; export serializes both.
+		const machineA = freshClone(parentBare);
+		process.chdir(machineA);
+		vi.spyOn(process, "exit").mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		api.cli.link.run("tests", childBare);
+		process.chdir(originalCwd);
+
+		const entries = api.embedded.registry.entries(machineA);
+		expect(entries).toEqual([{ path: "tests", url: childBare, branch: "main" }]);
+		const manifestFile = path.join(mkTmp(), "children.json");
+		fs.writeFileSync(manifestFile, api.embedded.manifest.serialize(api.embedded.manifest.build(entries)));
+
+		// Machine B: restore --from puts the child ON the manifest's branch.
+		const machineB = freshClone(parentBare);
+		const { results, exitCode } = api.embedded.restore({ cwd: machineB, from: manifestFile });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("restored");
+		expect(results[0].branch).toBe("main");
+
+		const child = path.join(machineB, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha);
+		expect(git(["branch", "--show-current"], child)).toBe("main");
+		expect(api.embedded.registry.getBranch("tests", machineB)).toBe("main");
+	});
+});
+
+describe("api.embedded.sync (day-2 pin sync)", () => {
+	it("fast-forwards the registered branch to a moved pin (fetching the pin first)", () => {
+		const { work, parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh }); // child on main @ childSha, branch registered
+
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("synced");
+		expect(results[0].branch).toBe("main");
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(sha2);
+		expect(git(["branch", "--show-current"], child)).toBe("main");
+		expect(git(["rev-parse", "--abbrev-ref", "main@{upstream}"], child)).toBe("origin/main");
+
+		// Idempotent: a second sync is a no-op.
+		const again = api.embedded.sync({ cwd: fresh });
+		expect(again.results[0].outcome).toBe("in-sync");
+		expect(again.exitCode).toBe(0);
+	});
+
+	it("dry-run reports the move without fetching or touching the child", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh, dryRun: true });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("synced");
+		expect(results[0].dryRun).toBe(true);
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha); // unmoved
+		// No fetch happened — the new pin is still absent from the object store.
+		const probe = spawnSync("git", ["cat-file", "-e", `${sha2}^{commit}`], { cwd: child });
+		expect(probe.status).not.toBe(0);
+	});
+
+	it("leaves a registered branch with commits beyond the pin alone (your work)", () => {
+		const { parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+
+		const child = path.join(fresh, "tests");
+		fs.writeFileSync(path.join(child, "wip.txt"), "local work");
+		git(["add", "."], child);
+		git(["commit", "-m", "local work beyond the pin"], child);
+		const localSha = git(["rev-parse", "HEAD"], child);
+		expect(localSha).not.toBe(childSha);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("ahead");
+		expect(results[0].note).toMatch(/beyond the pin.*your work/);
+		expect(git(["rev-parse", "HEAD"], child)).toBe(localSha); // untouched
+	});
+
+	it("leaves a dirty child alone", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2);
+		const child = path.join(fresh, "tests");
+		fs.writeFileSync(path.join(child, "uncommitted.txt"), "precious");
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("dirty");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha); // unmoved
+		expect(fs.readFileSync(path.join(child, "uncommitted.txt"), "utf8")).toBe("precious");
+	});
+
+	it("snaps a clean, detached child to the moved pin (staying detached)", () => {
+		const { work, parentBare } = makeParent({ gitlinkPath: "tests" });
+		// Ambiguous inference → restore leaves the child detached, no branch registered.
+		git(["push", "origin", "main:dev"], path.join(work, "src-tests"));
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("synced");
+		expect(results[0].branch).toBeNull();
+
+		const child = path.join(fresh, "tests");
+		expect(git(["rev-parse", "HEAD"], child)).toBe(sha2);
+		expect(git(["branch", "--show-current"], child)).toBe(""); // still detached
+	});
+
+	it("leaves a child on an unregistered branch alone", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh }); // registers "main"
+
+		const child = path.join(fresh, "tests");
+		git(["checkout", "-b", "feature"], child);
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		expect(results[0].outcome).toBe("unregistered-branch");
+		expect(results[0].note).toMatch(/'feature'.*left alone/);
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha); // unmoved
+		expect(git(["branch", "--show-current"], child)).toBe("feature");
+	});
+
+	it("reports pin-unavailable (non-zero) when one fetch cannot find the pin", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+
+		// A pin that exists nowhere the child can fetch from (never pushed).
+		const ghostSha = advanceChild(work, "tests", "ghost", { push: false });
+		bumpPin(fresh, "tests", ghostSha);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(exitCode).toBe(1);
+		expect(results[0].outcome).toBe("pin-unavailable");
+		expect(results[0].note).toMatch(/not found at origin/);
+		expect(git(["rev-parse", "HEAD"], path.join(fresh, "tests"))).toBe(childSha); // unmoved
+	});
+
+	it("reports no-repo only for an explicitly requested absent child", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare); // child never restored
+
+		// Unfiltered: an absent child is restore's job — silently ignored.
+		const all = api.embedded.sync({ cwd: fresh });
+		expect(all.results).toHaveLength(0);
+		expect(all.exitCode).toBe(0);
+
+		// Explicitly requested: reported, but not a sync failure.
+		const asked = api.embedded.sync({ cwd: fresh, paths: ["tests"] });
+		expect(asked.results[0].outcome).toBe("no-repo");
+		expect(asked.exitCode).toBe(0);
 	});
 });
 

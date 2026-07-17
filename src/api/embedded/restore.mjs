@@ -29,6 +29,13 @@ function removeClone(absChild, existedBefore) {
  * SHAs, resolving each URL strictest-source-first and SHA-verifying every clone
  * so a wrong convention guess fails closed.
  *
+ * Branch-aware: a branch for the child is resolved with the same layering as
+ * the URL — the registry (`embedded.<path>.branch`), then the manifest — and
+ * when neither supplies one it is inferred from the pin (exactly ONE `origin`
+ * branch containing it). With a branch the child ends ON that branch at the
+ * pin (upstream set best-effort, branch auto-registered); without one —
+ * including an ambiguous pin — the checkout stays detached.
+ *
  * Partial restore is normal — a public cloner without access to a private child
  * passes that path in `skip` and the rest still restore.
  *
@@ -68,7 +75,7 @@ export default function restore(opts = {}) {
 	for (const { path: childPath, sha } of links) {
 		if (wantSet && !wantSet.has(childPath)) continue;
 
-		const record = { path: childPath, sha, url: null, source: null, note: null };
+		const record = { path: childPath, sha, url: null, source: null, branch: null, note: null };
 
 		if (skipSet.has(childPath)) {
 			results.push({ ...record, outcome: "skipped" });
@@ -119,6 +126,15 @@ export default function restore(opts = {}) {
 			continue;
 		}
 
+		// Branch precedence mirrors URL precedence: the per-clone registry first,
+		// then the manifest. Inference from the pin needs the clone to exist, so
+		// it runs after SHA verification below. Own-property manifest access for
+		// the same reason as resolve (a child path named "constructor").
+		const manifestChild =
+			manifest && manifest.children && Object.hasOwn(manifest.children, childPath) ? manifest.children[childPath] : null;
+		const wantedBranch = self.embedded.registry.getBranch(childPath, root) || (manifestChild && manifestChild.branch) || null;
+		record.branch = wantedBranch;
+
 		if (dryRun) {
 			results.push({ ...record, outcome: "restored", dryRun: true });
 			continue;
@@ -152,15 +168,30 @@ export default function restore(opts = {}) {
 			continue;
 		}
 
-		const checkout = git(["-C", absChild, "checkout", "--quiet", "--detach", sha]);
-		if (checkout.code !== 0) {
-			removeClone(absChild, existedBefore);
-			results.push({ ...record, outcome: "pinned-mismatch", note: `could not check out ${sha.slice(0, 12)}; clone removed` });
-			continue;
+		// Branch-aware checkout: registry/manifest branch wins; otherwise infer it
+		// from the pin. Attach failure (e.g. an invalid branch name in the
+		// registry) falls back to today's detached checkout rather than failing
+		// the restore — the pin is verified present, so detached is always safe.
+		const branch = wantedBranch || self.embedded.branch.infer(absChild, sha);
+		let attached = false;
+		if (branch) {
+			attached = self.embedded.branch.attach(absChild, branch, sha);
+			if (!attached) record.note = `could not attach branch ${branch}; checked out detached`;
+		}
+		record.branch = attached ? branch : null;
+		if (!attached) {
+			const checkout = git(["-C", absChild, "checkout", "--quiet", "--detach", sha]);
+			if (checkout.code !== 0) {
+				removeClone(absChild, existedBefore);
+				results.push({ ...record, outcome: "pinned-mismatch", note: `could not check out ${sha.slice(0, 12)}; clone removed` });
+				continue;
+			}
 		}
 
-		// Persist the resolved URL so day-2 re-restores don't re-derive it.
+		// Persist the resolved URL (and the branch the child ended on) so day-2
+		// re-restores and `sync` don't re-derive them.
 		self.embedded.registry.setUrl(childPath, resolved.url, root);
+		if (attached) self.embedded.registry.setBranch(childPath, branch, root);
 		results.push({ ...record, outcome: "restored" });
 	}
 

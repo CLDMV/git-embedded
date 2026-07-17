@@ -100,7 +100,7 @@ git embedded restore          # clone every embedded child and check out its pin
 
 `restore` resolves each child's clone URL from up to four **optional** sources, strictest first, stopping at the first that yields a URL:
 
-1. **Local config registry** — `embedded.<path>.url` in _this clone's_ `.git/config`. Per-clone, never committed. Written automatically after a successful restore, and by `record` / `link`.
+1. **Local config registry** — `embedded.<path>.url` (and `embedded.<path>.branch`, see below) in _this clone's_ `.git/config`. Per-clone, never committed. Written automatically after a successful restore, and by `record` / `link`.
 2. **Manifest file** (`--from <file>`) — a JSON transfer file carried out-of-band (never committed). See `export` below.
 3. **`--base <url-base>`** — derives `<url-base>/<basename>.git` for each child.
 4. **Convention** (zero state) — the child is a sibling of wherever the parent was cloned from: `dirname(parent origin) + "/" + basename(<path>) + ".git"`. No configuration, but it only resolves when the child's repository is actually named after the gitlink path and sits beside the parent. A convention guess can only ever name strings already derivable from the committed tree, so it discloses nothing new.
@@ -108,6 +108,10 @@ git embedded restore          # clone every embedded child and check out its pin
 Every clone is **SHA-verified**: the parent's pinned commit must exist in the freshly cloned child (a `git fetch` is attempted first). If it doesn't — e.g. a convention guess resolved to the wrong repository — the clone `restore` created is removed and the child is reported `pinned-mismatch`. A wrong guess fails closed; it never plants the wrong code.
 
 Per-child outcomes are `restored`, `already-present`, `unresolved`, `pinned-mismatch`, or `skipped`, and `restore` exits non-zero if any child ends `unresolved` or `pinned-mismatch`. Use `--dry-run` to report resolution without cloning.
+
+### Branch-aware checkout
+
+A restored child does not have to end up detached. `restore` resolves a **branch** for each child with the same layering as the URL — `embedded.<path>.branch` in the local registry, then the manifest — and when neither supplies one, it infers the branch from the pin: if exactly **one** `origin` branch contains the pinned commit, that branch is used. With a branch, the child ends ON it at the pin (`checkout -B`), with upstream tracking set to `origin/<branch>` when it exists, and the branch is auto-registered like the URL. An ambiguous pin (on several branches) or an unmatchable one keeps today's detached checkout — inference never guesses.
 
 **Partial restore is the normal case.** A public contributor without access to a private child simply skips it:
 
@@ -141,6 +145,28 @@ git embedded restore --from children.json
 ```
 
 > **Never commit the manifest.** It contains the very URLs the anonymous-gitlink design keeps out of the tree. When `export -o` writes inside the worktree it appends the filename to `.git/info/exclude` as a courtesy, but keeping the manifest out-of-band is your responsibility.
+
+## Day-2: syncing pins
+
+When the parent pulls commits that move gitlink pins, the children on disk are still at the old SHAs. `git embedded sync` moves them — and only them; sync never touches the parent, so pulling the parent first is your step:
+
+```bash
+git pull
+git embedded sync
+```
+
+Per child, sync is deliberately conservative — a clean child follows the pin, anything that looks like your work is reported and left alone:
+
+- **already at the pin** — nothing to do (`in-sync`).
+- **uncommitted changes** — left alone (`dirty`).
+- **on the registered branch** (`embedded.<path>.branch`), clean — the branch is moved to the pin **fast-forward only**: the child's HEAD must be an ancestor of the pin. Commits beyond the pin are your work (`ahead`, left alone).
+- **on any other branch** — left alone (`unregistered-branch`).
+- **detached**, clean — snapped to the pin, staying detached (`synced`).
+- **pin not present locally** — one `git fetch origin` inside the child; if the pin still cannot be found the child is reported `pin-unavailable` and sync exits non-zero.
+
+Only `pin-unavailable` (and an unexpected checkout failure) fail the run — the left-alone outcomes protect in-progress work and exit zero. `sync` takes the same `[paths…]`, `--skip`, and `--dry-run` surface as `restore`.
+
+If the hooks from this package are installed, most parent operations already update the children automatically (detached, like standard submodules). `sync` covers the rest: hook-less clones, the `git reset --hard` gap, and keeping a child _on its branch_ as pins advance.
 
 ## Manual install (no CLI)
 

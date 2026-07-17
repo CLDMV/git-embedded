@@ -3,7 +3,7 @@ import { self } from "@cldmv/slothlet/runtime";
 export const spec = {
 	command: "restore",
 	description:
-		"Clone missing embedded child repos and check out their pinned SHAs. Each child's URL is resolved strictest-first — local config, a manifest (--from), --base, then the parent's origin convention — and every clone is SHA-verified so a wrong guess fails closed.",
+		"Clone missing embedded child repos and check out their pinned SHAs. Each child's URL is resolved strictest-first — local config, a manifest (--from), --base, then the parent's origin convention — and every clone is SHA-verified so a wrong guess fails closed. A branch from the registry/manifest (or inferred when exactly one origin branch contains the pin) puts the child ON that branch at the pin; otherwise the checkout is detached.",
 	args: [["[paths...]", "Restrict to these gitlink paths (default: every embedded gitlink)"]],
 	options: [
 		["--from <manifest>", "Read child URLs from a manifest JSON file (a transfer file; never committed)"],
@@ -21,7 +21,7 @@ export const spec = {
 };
 
 const LABEL = {
-	restored: (r) => `${r.dryRun ? "would restore" : "restored"} ${r.path} from ${r.source} (${r.url})`,
+	restored: (r) => `${r.dryRun ? "would restore" : "restored"} ${r.path} from ${r.source} (${r.url})${r.branch ? ` on branch ${r.branch}` : ""}`,
 	"already-present": (r) => `${r.path} already present`,
 	skipped: (r) => `${r.path} skipped`,
 	unresolved: (r) => `${r.path} unresolved${r.note ? ` — ${r.note}` : ""}`,
