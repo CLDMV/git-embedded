@@ -833,6 +833,24 @@ describe("api.embedded.sync (day-2 pin sync)", () => {
 		expect(exitCode).toBe(1);
 		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
 	});
+
+	it("reports sync-failed (not pin-unavailable) when the fallback fetch itself fails", () => {
+		const { work, parentBare, childSha } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+		const child = path.join(fresh, "tests");
+		// Break the child's origin so the fallback fetch errors out.
+		git(["remote", "set-url", "origin", path.join(mkTmp(), "gone.git")], child);
+		// A pin absent locally forces the fetch path.
+		const ghostSha = advanceChild(work, "tests", "ghost", { push: false });
+		bumpPin(fresh, "tests", ghostSha);
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(results[0].outcome).toBe("sync-failed");
+		expect(results[0].note).toMatch(/fetch origin failed/);
+		expect(exitCode).toBe(1);
+		expect(git(["rev-parse", "HEAD"], child)).toBe(childSha); // unmoved
+	});
 });
 
 describe("filter-path normalization (review round 6)", () => {

@@ -79,8 +79,15 @@ export default function sync(opts = {}) {
 		let linkStat = null;
 		try {
 			linkStat = fs.lstatSync(absChild);
-		} catch {
-			/* missing — handled as no-repo below */
+		} catch (err) {
+			// Only ENOENT means "missing". A non-ENOENT lstat error (EACCES/ENOTDIR
+			// on an existing path) is a real failure, not an absent child — surface
+			// it rather than silently proceeding.
+			if (err.code !== "ENOENT") {
+				results.push({ ...record, outcome: "sync-failed", note: `gitlink path unreadable (${err.code || err.message})` });
+				continue;
+			}
+			/* ENOENT — missing; handled as no-repo below */
 		}
 		if (linkStat && linkStat.isSymbolicLink()) {
 			results.push({ ...record, outcome: "sync-failed", note: "gitlink path is a symbolic link — refusing to touch it" });
@@ -127,7 +134,13 @@ export default function sync(opts = {}) {
 		// dry run) with a note instead of fetching.
 		let pinPresent = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
 		if (!pinPresent && !dryRun) {
-			git(["-C", absChild, "fetch", "--quiet", "origin"]);
+			const fetch = git(["-C", absChild, "fetch", "--quiet", "origin"]);
+			if (fetch.code !== 0) {
+				// A failed fetch (auth/network) is a real error, not "pin genuinely
+				// absent" — report sync-failed with stderr so it's actionable.
+				results.push({ ...record, outcome: "sync-failed", note: `git fetch origin failed: ${fetch.stderr || `exit ${fetch.code}`}` });
+				continue;
+			}
 			pinPresent = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
 			if (!pinPresent) {
 				results.push({ ...record, outcome: "pin-unavailable", note: `pinned ${sha.slice(0, 12)} not found at origin after fetch` });

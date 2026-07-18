@@ -93,8 +93,15 @@ export default function restore(opts = {}) {
 		let targetStat = null;
 		try {
 			targetStat = fs.lstatSync(absChild);
-		} catch {
-			/* missing — clone will create it */
+		} catch (err) {
+			// Only ENOENT means "missing — clone will create it". A non-ENOENT
+			// lstat error (EACCES/ENOTDIR on an existing path) must be refused, not
+			// assumed absent — otherwise we could clone into, and later removeClone
+			// against, a pre-existing path we can't even stat.
+			if (err.code !== "ENOENT") {
+				results.push({ ...record, outcome: "unresolved", note: `target unreadable (${err.code || err.message}) — refusing to touch it` });
+				continue;
+			}
 		}
 		if (targetStat && targetStat.isSymbolicLink()) {
 			results.push({ ...record, outcome: "unresolved", note: "target is a symbolic link — refusing to touch it" });
@@ -163,16 +170,23 @@ export default function restore(opts = {}) {
 		// One fetch is attempted before giving up, in case origin's default
 		// refspec did not include the pinned commit.
 		let present = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
+		let fetchErr = null;
 		if (!present) {
-			git(["-C", absChild, "fetch", "--quiet", "origin"]);
+			const fetch = git(["-C", absChild, "fetch", "--quiet", "origin"]);
+			if (fetch.code !== 0) fetchErr = fetch.stderr || `git fetch exited ${fetch.code}`;
 			present = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
 		}
 		if (!present) {
 			removeClone(absChild, existedBefore);
+			// A failed fetch (auth/network) is not the same as "wrong repo" — surface
+			// it so a pinned-mismatch isn't misread as a bad convention guess.
+			const why = fetchErr
+				? `fetch from ${resolved.source} repo failed (${fetchErr})`
+				: `pinned ${sha.slice(0, 12)} absent in ${resolved.source} repo`;
 			results.push({
 				...record,
 				outcome: "pinned-mismatch",
-				note: `pinned ${sha.slice(0, 12)} absent in ${resolved.source} repo; clone removed`
+				note: `${why}; clone removed`
 			});
 			continue;
 		}
