@@ -7,11 +7,12 @@
 # hook refuses, up-front, the moves where that sync (or the move itself)
 # would confuse or destroy in-flight child work.
 #
-# IMPORTANT PLUMBING FACT: a plain `git commit` ALSO emits a HEAD update line
-# in the reference transaction (HEAD's reflog records the new commit), so
-# "HEAD moved" alone cannot distinguish a commit from a checkout. The mode
-# logic below therefore reasons about what the move would actually DO to each
-# child, and classifies append-vs-jump by commit parentage where it matters.
+# IMPORTANT PLUMBING FACT: a plain `git commit` moves the ref HEAD points to,
+# reported in the reference transaction as HEAD (git <=2.43) or as the branch
+# ref refs/heads/<branch> (git 2.54+) — the guard watches BOTH. Either way,
+# "HEAD moved" alone cannot distinguish a commit from a checkout, so the mode
+# logic below reasons about what the move would actually DO to each child, and
+# classifies append-vs-jump by commit parentage where it matters.
 #
 # Mode (git config embedded.guard — local overrides global; default precise):
 #   precise  Block only when a DIRTY child's HEAD differs from the pin in the
@@ -47,11 +48,18 @@ esac
 # Other ref updates (fetch fast-forwards, stash refs, tags) don't touch the
 # working tree and aren't guarded.
 zeros="0000000000000000000000000000000000000000"
+# The ref a working-tree HEAD move touches is either literal HEAD (a detached
+# checkout, or a commit on a detached HEAD) or — when HEAD is on a branch — the
+# BRANCH ref HEAD points to. git <=2.43 emitted a redundant HEAD line for a
+# commit, so matching "HEAD" alone sufficed; git 2.54 emits ONLY the branch ref
+# (refs/heads/<branch>) for a commit, so without also matching the current
+# branch every commit slips past the guard. Resolve HEAD's branch and watch both.
+head_ref=$(git symbolic-ref --quiet HEAD 2>/dev/null)
 moving=0
 old_head=""
 new_head=""
 while read old_sha new_sha ref; do
-    [ "$ref" = "HEAD" ] || continue
+    [ "$ref" = "HEAD" ] || { [ -n "$head_ref" ] && [ "$ref" = "$head_ref" ]; } || continue
     [ "$old_sha" = "$new_sha" ] && continue
     moving=1
     old_head=$old_sha
