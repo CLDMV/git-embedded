@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# pre-push
+#
+# Refuses to push parent commits whose gitlink pins reference child commits
+# that are NOT reachable from the child's own origin. Without this, a parent
+# that pins a committed-but-unpushed child publishes a dangling pointer:
+# every other machine's `git embedded restore` fails on that child with
+# pinned-mismatch, because the child's origin has never seen the commit.
+#
+# This is git-embedded's analog of `git push --recurse-submodules=check` —
+# stock git can't provide it here because that machinery locates children via
+# .gitmodules registration, which anonymous gitlinks deliberately omit.
+#
+# Mode (git config embedded.pushRecurse — local overrides global; default check):
+#   check      Verify each pin new to the remote is reachable from some
+#              refs/remotes/origin/* tip in the child (refreshing with one
+#              `git fetch origin` on a miss). Unreachable → reject the push
+#              with a "push the child first" message.
+#   on-demand  Like check, but first try to publish the pin by pushing the
+#              child's CURRENT branch (only when that branch contains the pin
+#              and the child is not detached). Falls back to check's rejection
+#              when it can't.
+#   off        No verification.
+#
+# One-shot override:  git -c embedded.pushRecurse=<mode> push …
+#
+# Args: $1 = remote name, $2 = remote URL.
+# Stdin: <local_ref> SP <local_sha> SP <remote_ref> SP <remote_sha> per ref.
+
+push_mode=$(git config --get embedded.pushRecurse 2>/dev/null)
+case "$push_mode" in
+off) exit 0 ;;
+check | on-demand) ;;
+*) push_mode="check" ;;
+esac
+
+zeros="0000000000000000000000000000000000000000"
+
+# Is $2 (a commit SHA) reachable from any origin remote-tracking tip inside
+# the child repo at $1?
+reachable_from_origin() (
+    cd "$1" || return 1
+    for tip in $(git for-each-ref --format='%(objectname)' refs/remotes/origin 2>/dev/null); do
+        if git merge-base --is-ancestor "$2" "$tip" 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
+)
+
+# Verify one (path, pin). Prints the rejection message and returns 1 when the
+# pin cannot be confirmed published.
+verify_pin() {
+    local path="$1" pin="$2"
+
+    if ! [ -d "$path/.git" ] && ! [ -f "$path/.git" ]; then
+        echo "git-embedded: ✗ cannot verify $path pin ${pin:0:12} — the child repo is not present here" >&2
+        echo "  restore it first (git embedded restore '$path'), or bypass once with -c embedded.pushRecurse=off" >&2
+        return 1
+    fi
+
+    # Fast path: current remote-tracking knowledge.
+    reachable_from_origin "$path" "$pin" && return 0
+
+    # Refresh once — local refs/remotes may simply be stale.
+    (cd "$path" && git fetch --quiet origin 2>/dev/null)
+    reachable_from_origin "$path" "$pin" && return 0
+
+    if [ "$push_mode" = "on-demand" ]; then
+        # Publish the child's current branch iff it is a real branch that
+        # contains the pin. Never invent a ref for a detached child.
+        local branch
+        branch=$(cd "$path" && git symbolic-ref --quiet --short HEAD 2>/dev/null)
+        if [ -n "$branch" ] && (cd "$path" && git merge-base --is-ancestor "$pin" "$branch" 2>/dev/null); then
+            echo "git-embedded: pushing $path ($branch) to publish pin ${pin:0:12}…" >&2
+            # `>&2 2>&1` (not `2>&1 >&2`) sends BOTH streams to stderr — order
+            # matters. A successful push means the pin (an ancestor of $branch,
+            # verified above) is now on origin, so succeed directly rather than
+            # re-checking refs/remotes/origin, which a plain push may not refresh.
+            if (cd "$path" && git push --quiet origin "$branch" >&2 2>&1); then
+                return 0
+            fi
+        fi
+    fi
+
+    echo "git-embedded: ✗ $path pin ${pin:0:12} is not on that child's origin" >&2
+    echo "  push the child first (git -C '$path' push), then retry this push" >&2
+    return 1
+}
+
+block=0
+checked=""
+
+# For each pushed ref, examine every commit that is new to the remote and
+# collect its gitlink pins: the pins CHANGED by each new commit (diff-tree,
+# cheap) plus the full gitlink set of the tip (ls-tree) — a pin unchanged
+# throughout the range is by definition still in the tip's tree, so the union
+# covers every pin the remote is about to learn.
+while read local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zeros" ] && continue # deletion — nothing to verify
+
+    if [ "$remote_sha" = "$zeros" ]; then
+        # New remote ref: bound the walk by everything already on any remote.
+        range_args=("$local_sha" --not --remotes)
+    else
+        range_args=("$remote_sha..$local_sha")
+    fi
+
+    pins_to_check=""
+
+    # Changed gitlink pins across the new commits.
+    for c in $(git rev-list "${range_args[@]}" 2>/dev/null); do
+        while IFS=$'\t' read -r meta path; do
+            set -- $meta
+            # diff-tree --raw: :<old_mode> <new_mode> <old_sha> <new_sha> <status>
+            [ "$2" = "160000" ] || continue
+            new_pin="$4"
+            [ "$new_pin" = "$zeros" ] && continue # gitlink removed
+            # pin-FIRST so a $path with spaces survives the read-back below
+            # (pin is a fixed-width sha; path is the remainder).
+            pins_to_check="$pins_to_check$new_pin $path"$'\n'
+            # --no-renames: without it, a rename/copy raw line carries TWO tab-
+            # separated paths (old<TAB>new), which would land a tabbed value in $path.
+        done < <(git diff-tree -r --no-commit-id --no-renames --raw "$c" 2>/dev/null)
+    done
+
+    # Verify every gitlink in the tip when the remote can't derive the tree from
+    # the delta: a NEW ref (learning the whole tree), OR a NON-fast-forward update
+    # (force-push / rewritten history) — there a pin can be new to the remote yet
+    # unchanged within remote_sha..local_sha, so the diff pass alone would miss it.
+    # For an ordinary fast-forward the diff pass suffices (an unchanged pin was
+    # already in the remote's tree and verified when first pushed), so a clone that
+    # never restored its children can still push commits that touch no pin.
+    if [ "$remote_sha" = "$zeros" ] || ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+        while IFS=$'\t' read -r meta path; do
+            set -- $meta
+            [ "$2" = "commit" ] || continue
+            pins_to_check="$pins_to_check$3 $path"$'\n'
+        done < <(git ls-tree -r "$local_sha" 2>/dev/null)
+    fi
+
+    # Verify each unique (path, pin) once. Read each line WHOLE (IFS= disables
+    # field-splitting), then split the pin off at the FIRST space: a plain
+    # `read -r pin path` strips a LEADING space from $path (default-IFS trims the
+    # last field's leading whitespace), so a gitlink dir whose name begins with a
+    # space would be looked up at the wrong location — and a trailing space would
+    # be dropped too. The pin is a fixed-width sha with no spaces, so the first
+    # space is always the pin/path boundary; everything after it (leading or
+    # trailing space included) is the path verbatim.
+    while IFS= read -r line; do
+        case "$line" in *" "*) ;; *) continue ;; esac # skip blank/malformed
+        pin=${line%% *}
+        path=${line#* }
+        [ -n "$pin" ] && [ -n "$path" ] || continue
+        case "$checked" in *"|$path=$pin|"*) continue ;; esac
+        checked="$checked|$path=$pin|"
+        verify_pin "$path" "$pin" || block=1
+    done <<<"$pins_to_check"
+done
+
+[ "$block" = "1" ] && exit 1
+exit 0

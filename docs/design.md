@@ -19,7 +19,7 @@ The hooks in this package close the registration gap without requiring a registr
 
 ## Why this matters: the URL is the leak
 
-For most submodule use cases, the URL in `.gitmodules` is uncontroversial — the parent is open and the child is open, the URL is just a convenience for `clone --recurse-submodules`. For a parent that wants to hide the *existence* of a private child repo, the `.gitmodules` URL is the leak. Anyone who can read the public parent can read `.gitmodules`, see the URL of the private child, and at minimum learn that a private resource exists at that location.
+For most submodule use cases, the URL in `.gitmodules` is uncontroversial — the parent is open and the child is open, the URL is just a convenience for `clone --recurse-submodules`. For a parent that wants to hide the _existence_ of a private child repo, the `.gitmodules` URL is the leak. Anyone who can read the public parent can read `.gitmodules`, see the URL of the private child, and at minimum learn that a private resource exists at that location.
 
 Avoiding `.gitmodules` is the obvious fix, but doing so loses the working-tree automation. This package restores the automation while keeping the parent free of URL data.
 
@@ -35,11 +35,21 @@ Avoiding `.gitmodules` is the obvious fix, but doing so loses the working-tree a
 - `committed` — updates already applied.
 - `aborted` — informational.
 
-The hook script acts only on the `prepared` phase, where rejection is possible. It reads the proposed ref updates from stdin (one `old_sha new_sha ref` per line), filters to lines where `ref` is `HEAD` and `old_sha != new_sha` (an actual HEAD move), and walks every gitlink in the current tree checking for uncommitted changes via `git diff-index --quiet HEAD --` inside each child. If any child is dirty, the hook prints a message to stderr and exits non-zero, which aborts the parent operation.
+The hook script acts only on the `prepared` phase, where rejection is possible. It reads the proposed ref updates from stdin (one `old_sha new_sha ref` per line) and filters to lines where `ref` is `HEAD` with `old_sha != new_sha` (a HEAD move).
 
-**What it catches.** Every git command that ultimately moves HEAD goes through a reference transaction. That includes `git checkout <ref>`, `git switch <branch>`, `git reset` (any mode that moves HEAD), `git pull` (both fast-forward and rebase variants), `git merge`, `git rebase` (each step), `git bisect` (each step), `git cherry-pick`, and others.
+**A plumbing fact that shapes the design:** a plain `git commit` ALSO emits a HEAD update line in the reference transaction (HEAD's reflog records the new commit), so "HEAD moved" alone cannot distinguish a commit from a checkout. An earlier revision of this document claimed commits were not caught; that was wrong, and the hook now reasons about what the move would actually do to each child instead of assuming the operation's type. Where the type matters (strict mode), append vs jump is classified by parentage: a move whose NEW commit lists the current (pre-move) HEAD among its parents is an append (commit, merge, cherry-pick step); everything else is a jump (checkout, switch, reset, bisect). The pre-move HEAD is resolved directly — the transaction line's old value reads as the null SHA on a checkout-to-SHA detach and must not be trusted for this. One known edge: switching to a branch whose tip is a direct child of the current HEAD is indistinguishable from a commit by parentage and classifies as an append.
 
-**What it does not catch.** Operations that don't move HEAD aren't guarded, by design: `git commit` (creates a new commit but doesn't update the gitlink without explicit staging), `git checkout -- file` (file-level checkout), `git stash` itself (records stash refs, not HEAD), and so on. These don't require child-update behavior.
+**Guard modes** (`git config embedded.guard`, local over global; two-part settings keys in the `embedded.*` section are structurally reserved — registry entries are always three-part `embedded.<path>.url|branch`):
+
+- `precise` _(default)_ — block only when a DIRTY child's HEAD differs from the pin recorded in the NEW commit: exactly the condition under which `update-embedded-repos` would try to move a child carrying uncommitted changes. A clean child never blocks; a dirty child whose pin equals its HEAD never blocks (the sync no-ops). This lets a parent evolve — including plain commits and pin bumps — while unrelated children are mid-work.
+- `strict` — the everything-synced policy for workspaces that want the parent to only ever snapshot a fully-committed state. Any dirty child blocks any HEAD move, and on APPENDS every child's pin in the new commit must equal that child's current HEAD — so a parent commit can never ship a stale pin (work done in a child but not recorded in the parent). Jumps only require all-clean: their pins are expected to differ, and the post-hook sync moves the (clean) children afterwards.
+- `off` — no guarding.
+
+One-shot override for any mode: `git -c embedded.guard=<mode> <command>`. "Dirty" is `git diff-index --quiet HEAD` semantics — modified/staged tracked files; untracked files never count.
+
+**What it catches.** Every git command that updates HEAD in a reference transaction: `git commit`, `git checkout <ref>`, `git switch <branch>`, `git reset`, `git pull`, `git merge`, `git rebase` (each step), `git bisect` (each step), `git cherry-pick`, and others — with per-mode rules as above.
+
+**What it does not catch.** Operations that don't move HEAD: `git checkout -- file` (file-level checkout), `git stash` itself (records stash refs, not HEAD), bare index edits. These don't trigger child-update behavior, so there is nothing to guard.
 
 **Caveat about error messaging.** When the hook exits non-zero, git wraps its own message around the script's stderr output. The user sees a message like:
 
@@ -76,40 +86,57 @@ The detached-HEAD checkout matches standard submodule behavior: parents pin spec
 **What it does not catch.** Two notable gaps:
 
 - `git reset --hard <commit>` updates the index and working tree but does **not** fire `post-checkout`, `post-merge`, or `post-rewrite`. The `reference-transaction` guard catches this case at the prepared phase (because `reset` does move HEAD via a ref transaction), so a `--hard` reset with a dirty child is refused — but a `--hard` reset with a clean child completes without the children being auto-updated. The mitigation is to either accept the gap, manually re-run the script, or use a `git-foo` wrapper command.
+
+### `pre-push` (pin publication check)
+
+**Purpose.** Refuse to push parent commits whose gitlink pins reference child commits that are not reachable from the child's own origin. Without this, a parent that pins a committed-but-unpushed child publishes a dangling pointer: every other machine's `git embedded restore` fails on that child with `pinned-mismatch`, because the child's origin has never seen the commit. The dirty-state guard cannot catch this — a committed-but-unpushed child is clean.
+
+This is git-embedded's analog of `git push --recurse-submodules=check`; stock git cannot provide it here because that machinery locates children via `.gitmodules` registration, which anonymous gitlinks deliberately omit — the same registration gap the other hooks close for checkout.
+
+**Mechanism.** For each pushed ref, the hook collects the gitlink pins the remote is about to learn: the pins _changed_ by each commit new to the remote (`git diff-tree`, cheap), plus — only when the remote ref is being _created_ — every gitlink in the tip's tree. Each unique `(path, pin)` is verified inside the child working copy: reachable from some `refs/remotes/origin/*` tip, with one `git fetch origin` refresh on a miss so stale tracking refs don't produce false rejections. A pin change for a child that is not present in the working tree is rejected (it cannot be verified). Because only _newly-introduced_ pins are checked on existing-ref updates, a clone that never restored its children can still push commits that touch no pin.
+
+**Modes** (`git config embedded.pushRecurse`, local over global):
+
+- `check` _(default)_ — reject the push with a "push the child first" message.
+- `on-demand` — first try to publish the pin by pushing the child's CURRENT branch (only when that branch contains the pin and the child is not detached), then fall back to `check`'s rejection. Opt-in because implicitly pushing a child branch as a side effect of a parent push is surprising.
+- `off` — no verification.
+
+One-shot override: `git -c embedded.pushRecurse=<mode> push …`.
+
 - `git stash pop` modifies the working tree without moving HEAD. It does not affect embedded children (stash entries are recorded in the parent's stash ref, not in the children), but anyone expecting "all working-tree-modifying commands are guarded" will not see consistency here.
 
 ## Coverage matrix
 
-| Operation | `reference-transaction` (guard) | `update-embedded-repos` (update) |
-|---|---|---|
-| `git checkout <ref>` | Refuses if any child is dirty | Updates children to new pins |
-| `git switch <branch>` | Refuses if any child is dirty | Updates children to new pins |
-| `git reset --hard <commit>` | Refuses if any child is dirty | **Gap** — does not fire `post-*` hooks |
-| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves) | Does not fire `post-*` hooks (HEAD-only change) |
-| `git pull` (fast-forward) | Refuses if any child is dirty | Updates children |
-| `git pull --rebase` | Refuses at each rebase step | Updates children after rebase completes |
-| `git merge <commit>` | Refuses if any child is dirty | Updates children via `post-merge` |
-| `git rebase` | Refuses at each step | Updates children via `post-rewrite` |
-| `git bisect <good/bad/run>` | Refuses if any child is dirty | Updates children at each bisect step |
-| `git cherry-pick` | Refuses if any child is dirty | Updates children via `post-checkout` |
-| `git stash pop` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
-| `git commit` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
-| `git checkout -- file` | Not guarded (no HEAD move) | Not updated (no HEAD move; not needed) |
+| Operation                           | `reference-transaction` (guard)                                                        | `update-embedded-repos` (update)                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `git checkout <ref>`                | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git switch <branch>`               | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git reset --hard <commit>`         | Refuses if any child is dirty                                                          | **Gap** — does not fire `post-*` hooks               |
+| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves)                                             | Does not fire `post-*` hooks (HEAD-only change)      |
+| `git pull` (fast-forward)           | Refuses if any child is dirty                                                          | Updates children                                     |
+| `git pull --rebase`                 | Refuses at each rebase step                                                            | Updates children after rebase completes              |
+| `git merge <commit>`                | Refuses if any child is dirty                                                          | Updates children via `post-merge`                    |
+| `git rebase`                        | Refuses at each step                                                                   | Updates children via `post-rewrite`                  |
+| `git bisect <good/bad/run>`         | Refuses if any child is dirty                                                          | Updates children at each bisect step                 |
+| `git cherry-pick`                   | Refuses if any child is dirty                                                          | Updates children via `post-checkout`                 |
+| `git stash pop`                     | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
+| `git commit`                        | Refuses (precise: a dirty child it would re-pin; strict: any dirty child or stale pin) | Not updated (records current pins; no `post-*` hook) |
+| `git checkout -- file`              | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
 
 ## Comparison to standard submodules
 
-| Property | Standard submodule | Anonymous gitlink + these hooks |
-|---|---|---|
-| Child URL in parent | Yes, in `.gitmodules` | No |
-| Tree-level pin | Gitlink | Gitlink |
-| Public viewer sees | URL, path, current SHA | Just the SHA (no link to follow) |
-| `git submodule update` | Works | Not used (registry-bound; hooks replace it) |
-| `submodule.recurse=true` | Works | Not used (registry-bound; hooks replace it) |
-| `git status` divergence | Yes | Yes |
-| `git add path` infers SHA | Yes | Yes |
-| `--recurse-submodules` clone | Pulls child | No-op (no registry) |
-| Initial child clone | Automatic via registry | Manual or via the planned CLI |
-| Dirty-child guard | Default refuses on update | Hook refuses on the HEAD move itself |
+| Property                     | Standard submodule        | Anonymous gitlink + these hooks             |
+| ---------------------------- | ------------------------- | ------------------------------------------- |
+| Child URL in parent          | Yes, in `.gitmodules`     | No                                          |
+| Tree-level pin               | Gitlink                   | Gitlink                                     |
+| Public viewer sees           | URL, path, current SHA    | Just the SHA (no link to follow)            |
+| `git submodule update`       | Works                     | Not used (registry-bound; hooks replace it) |
+| `submodule.recurse=true`     | Works                     | Not used (registry-bound; hooks replace it) |
+| `git status` divergence      | Yes                       | Yes                                         |
+| `git add path` infers SHA    | Yes                       | Yes                                         |
+| `--recurse-submodules` clone | Pulls child               | No-op (no registry)                         |
+| Initial child clone          | Automatic via registry    | Manual or via the planned CLI               |
+| Dirty-child guard            | Default refuses on update | Hook refuses on the HEAD move itself        |
 
 The most useful difference is the **guard timing**. Standard submodules let the parent operation proceed and then refuse the child update, leaving the developer in a parent-moved-child-stale state that has to be backed out. The `reference-transaction` guard refuses the whole transaction at the parent level, so the working tree never reaches the inconsistent state.
 
