@@ -55,7 +55,7 @@ verify_pin() {
 
     if ! [ -d "$path/.git" ] && ! [ -f "$path/.git" ]; then
         echo "git-embedded: ✗ cannot verify $path pin ${pin:0:12} — the child repo is not present here" >&2
-        echo "  restore it first (git embedded restore $path), or bypass once with -c embedded.pushRecurse=off" >&2
+        echo "  restore it first (git embedded restore '$path'), or bypass once with -c embedded.pushRecurse=off" >&2
         return 1
     fi
 
@@ -84,7 +84,7 @@ verify_pin() {
     fi
 
     echo "git-embedded: ✗ $path pin ${pin:0:12} is not on that child's origin" >&2
-    echo "  push the child first (git -C $path push), then retry this push" >&2
+    echo "  push the child first (git -C '$path' push), then retry this push" >&2
     return 1
 }
 
@@ -116,7 +116,9 @@ while read local_ref local_sha remote_ref remote_sha; do
             [ "$2" = "160000" ] || continue
             new_pin="$4"
             [ "$new_pin" = "$zeros" ] && continue # gitlink removed
-            pins_to_check="$pins_to_check$path $new_pin"$'\n'
+            # pin-FIRST so a $path with spaces survives the read-back below
+            # (pin is a fixed-width sha; path is the remainder).
+            pins_to_check="$pins_to_check$new_pin $path"$'\n'
         done < <(git diff-tree -r --no-commit-id --raw "$c" 2>/dev/null)
     done
 
@@ -127,15 +129,16 @@ while read local_ref local_sha remote_ref remote_sha; do
     # means a clone that never restored the children can still push commits
     # that don't touch any pin.
     if [ "$remote_sha" = "$zeros" ]; then
-        while read entry_mode entry_type pin path; do
-            [ "$entry_type" = "commit" ] || continue
-            pins_to_check="$pins_to_check$path $pin"$'\n'
+        while IFS=$'\t' read -r meta path; do
+            set -- $meta
+            [ "$2" = "commit" ] || continue
+            pins_to_check="$pins_to_check$3 $path"$'\n'
         done < <(git ls-tree -r "$local_sha" 2>/dev/null)
     fi
 
     # Verify each unique (path, pin) once.
-    while read -r path pin; do
-        [ -n "$path" ] && [ -n "$pin" ] || continue
+    while read -r pin path; do
+        [ -n "$pin" ] && [ -n "$path" ] || continue
         case "$checked" in *"|$path=$pin|"*) continue ;; esac
         checked="$checked|$path=$pin|"
         verify_pin "$path" "$pin" || block=1

@@ -61,7 +61,7 @@ function installHook(repoDir, name) {
  * the requested hooks installed. Child working copy inside the parent is a
  * clone of the child bare (origin wired), attached to main at c1.
  */
-function makeGuardedParent({ hooks = [] } = {}) {
+function makeGuardedParent({ hooks = [], childPath = "tests" } = {}) {
 	const work = mkTmp();
 	const childBare = path.join(work, "child.git");
 	git(["init", "--bare", "-b", "main", childBare]);
@@ -80,14 +80,14 @@ function makeGuardedParent({ hooks = [] } = {}) {
 	fs.writeFileSync(path.join(parent, "README.md"), "parent");
 	git(["add", "."], parent);
 	git(["commit", "-m", "parent init"], parent);
-	git(["clone", "--quiet", childBare, path.join(parent, "tests")], parent);
-	git(["add", "tests"], parent);
-	git(["commit", "-m", "embed tests"], parent);
+	git(["clone", "--quiet", childBare, path.join(parent, childPath)], parent);
+	git(["add", childPath], parent);
+	git(["commit", "-m", `embed ${childPath}`], parent);
 	git(["remote", "add", "origin", parentBare], parent);
 
 	for (const h of hooks) installHook(parent, h);
-	const child = path.join(parent, "tests");
-	return { work, parent, parentBare, child, childBare };
+	const child = path.join(parent, childPath);
+	return { work, parent, parentBare, child, childBare, childPath };
 }
 
 /** Commit inside the child (advances its HEAD; keeps it clean). */
@@ -233,6 +233,19 @@ describe.skipIf(process.platform === "win32")("reference-transaction guard modes
 		const ok = gitTry(["checkout", "--quiet", "HEAD~1"], parent);
 		expect(ok.status).toBe(0);
 	});
+
+	it("precise: a spaced-path child that is dirty and would be re-pinned is blocked", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["reference-transaction"], childPath: "my tests" });
+		const commitA = git(["rev-parse", "HEAD"], parent);
+		childCommit(child, "c2");
+		git(["add", "my tests"], parent);
+		git(["commit", "-m", "bump pin to c2"], parent);
+		dirtyChild(child); // child at c2; commitA pins c1 → re-pin + dirty
+		const blocked = gitTry(["checkout", "--quiet", commitA], parent);
+		expect(blocked.status).not.toBe(0);
+		expect(blocked.stderr).toMatch(/would re-pin/);
+		expect(blocked.stderr).toContain("my tests"); // full path, not split on the space
+	});
 });
 
 describe.skipIf(process.platform === "win32")("pre-push pin-publication check", () => {
@@ -315,5 +328,26 @@ describe.skipIf(process.platform === "win32")("pre-push pin-publication check", 
 		expect(git(["ls-remote", "origin", "main"], child).split(/\s/)[0]).toBe(c2);
 		// And the parent push landed.
 		expect(git(["ls-remote", "origin", "main"], parent).split(/\s/)[0]).toBe(git(["rev-parse", "HEAD"], parent));
+	});
+
+	it("check: a child whose gitlink path contains spaces is verified correctly (published pin passes)", () => {
+		const { parent } = makeGuardedParent({ hooks: ["pre-push"], childPath: "my tests" });
+		// Pin c1 is already on the child's origin. The old path-first serialization
+		// misparsed "my tests" into path "my" and wrongly rejected this push.
+		git(["push", "--quiet", "origin", "main"], parent); // would throw if blocked
+		expect(git(["ls-remote", "origin", "main"], parent)).not.toBe("");
+	});
+
+	it("check: an unpublished pin for a spaced-path child is rejected naming the full path", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["pre-push"], childPath: "my tests" });
+		git(["push", "--quiet", "origin", "main"], parent);
+		childCommit(child, "c2"); // committed, NOT pushed to the child's origin
+		git(["add", "my tests"], parent);
+		git(["commit", "-m", "bump pin to unpublished c2"], parent);
+		const blocked = gitTry(["push", "--quiet", "origin", "main"], parent);
+		expect(blocked.status).not.toBe(0);
+		// Old bug: misparsed to path "my" → "not present"; fixed: real path + cause.
+		expect(blocked.stderr).toMatch(/not on that child's origin/);
+		expect(blocked.stderr).toContain("my tests");
 	});
 });
