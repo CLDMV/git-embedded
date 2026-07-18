@@ -384,4 +384,29 @@ describe.skipIf(process.platform === "win32")("pre-push pin-publication check", 
 		expect(blocked.stderr).toMatch(/not on that child's origin/);
 		expect(blocked.stderr).toContain("my tests");
 	});
+
+	it("check: a non-fast-forward push re-verifies the whole tip (a pin unchanged in the range but now unreachable is caught)", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["pre-push"] });
+		const c1 = git(["rev-parse", "HEAD"], child);
+		// Publish c2, pin it, and land it on the parent's origin (verified new-ref push).
+		childCommit(child, "c2");
+		git(["push", "--quiet", "origin", "main"], child); // publish c2
+		git(["add", "tests"], parent);
+		git(["commit", "-m", "M: pin c2"], parent);
+		const M = git(["rev-parse", "HEAD"], parent);
+		fs.writeFileSync(path.join(parent, "README.md"), "y");
+		git(["add", "README.md"], parent);
+		git(["commit", "-m", "Y"], parent); // P1 = M -> Y (tests@c2, verified)
+		git(["push", "--quiet", "origin", "main"], parent);
+		// The child's origin now loses c2 (rewound to c1) — c2 is unreachable there again.
+		git(["push", "--quiet", "--force", "origin", `${c1}:main`], child);
+		// Diverge the parent from M with a commit that does NOT touch the pin.
+		git(["reset", "--hard", M], parent);
+		git(["commit", "--allow-empty", "-m", "Z: diverged, pin unchanged"], parent); // P2 = M -> Z
+		// Non-fast-forward push: tests@c2 is unchanged in P1..P2 (so the diff-only pass
+		// misses it) and no longer on the child's origin — the full-tip pass must reject.
+		const blocked = gitTry(["push", "--quiet", "--force", "origin", "main"], parent);
+		expect(blocked.status).not.toBe(0);
+		expect(blocked.stderr).toMatch(/not on that child's origin/);
+	});
 });

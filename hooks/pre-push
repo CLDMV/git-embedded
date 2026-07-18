@@ -119,16 +119,19 @@ while read local_ref local_sha remote_ref remote_sha; do
             # pin-FIRST so a $path with spaces survives the read-back below
             # (pin is a fixed-width sha; path is the remainder).
             pins_to_check="$pins_to_check$new_pin $path"$'\n'
-        done < <(git diff-tree -r --no-commit-id --raw "$c" 2>/dev/null)
+            # --no-renames: without it, a rename/copy raw line carries TWO tab-
+            # separated paths (old<TAB>new), which would land a tabbed value in $path.
+        done < <(git diff-tree -r --no-commit-id --no-renames --raw "$c" 2>/dev/null)
     done
 
-    # For a NEW remote ref, also verify every gitlink in the tip — the remote
-    # is learning the whole tree, not a delta. For updates to an existing ref
-    # the diff pass suffices: a pin unchanged across the range is already in
-    # the remote's tree (and was verified when it was first pushed). This also
-    # means a clone that never restored the children can still push commits
-    # that don't touch any pin.
-    if [ "$remote_sha" = "$zeros" ]; then
+    # Verify every gitlink in the tip when the remote can't derive the tree from
+    # the delta: a NEW ref (learning the whole tree), OR a NON-fast-forward update
+    # (force-push / rewritten history) — there a pin can be new to the remote yet
+    # unchanged within remote_sha..local_sha, so the diff pass alone would miss it.
+    # For an ordinary fast-forward the diff pass suffices (an unchanged pin was
+    # already in the remote's tree and verified when first pushed), so a clone that
+    # never restored its children can still push commits that touch no pin.
+    if [ "$remote_sha" = "$zeros" ] || ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
         while IFS=$'\t' read -r meta path; do
             set -- $meta
             [ "$2" = "commit" ] || continue
