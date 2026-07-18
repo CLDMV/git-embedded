@@ -26,6 +26,7 @@ name: 🚀 Next Release (v4)
 on:
     push:
         branches: [next]
+    workflow_dispatch: # manual kick — e.g. to open/refresh the PR for content already on `next`
 
 permissions:
     contents: write
@@ -39,13 +40,15 @@ concurrency:
 
 jobs:
     plan:
-        # Loop guard: the refresh/create steps push a `chore: bump version`
-        # commit to `next` (as the bot), and next-reset.yml force-pushes
-        # `next` (as the bot). Neither should re-trigger a release-PR refresh.
-        # Replace `cldmv-bot[bot]` with your bot App's login if different.
+        # Loop guard: skip only the release machinery's own `chore: bump version`
+        # push (create/update-release-pr writes it back to `next`). Do NOT gate on
+        # github.actor — dependabot security PRs are auto-merged BY the bot, and
+        # excluding the bot actor meant bot-merged PRs never refreshed the release
+        # PR (fatal on `hotfixes`, where every merge is a bot auto-merge). Reset
+        # force-pushes are harmless: the detect step below no-ops when in sync with
+        # master. workflow_dispatch bypasses the guard (event_name != 'push').
         if: |
-            github.actor != 'cldmv-bot[bot]' &&
-            github.actor != 'github-actions[bot]' &&
+            github.event_name != 'push' ||
             !startsWith(github.event.head_commit.message, 'chore: bump version')
         name: "🔍 Plan (detect changes + resolve PR)"
         runs-on: ubuntu-latest
