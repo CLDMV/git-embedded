@@ -73,8 +73,12 @@ verify_pin() {
         branch=$(cd "$path" && git symbolic-ref --quiet --short HEAD 2>/dev/null)
         if [ -n "$branch" ] && (cd "$path" && git merge-base --is-ancestor "$pin" "$branch" 2>/dev/null); then
             echo "git-embedded: pushing $path ($branch) to publish pin ${pin:0:12}…" >&2
-            if (cd "$path" && git push --quiet origin "$branch" 2>&1 >&2); then
-                reachable_from_origin "$path" "$pin" && return 0
+            # `>&2 2>&1` (not `2>&1 >&2`) sends BOTH streams to stderr — order
+            # matters. A successful push means the pin (an ancestor of $branch,
+            # verified above) is now on origin, so succeed directly rather than
+            # re-checking refs/remotes/origin, which a plain push may not refresh.
+            if (cd "$path" && git push --quiet origin "$branch" >&2 2>&1); then
+                return 0
             fi
         fi
     fi

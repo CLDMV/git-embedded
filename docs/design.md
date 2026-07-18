@@ -107,21 +107,21 @@ One-shot override: `git -c embedded.pushRecurse=<mode> push …`.
 
 ## Coverage matrix
 
-| Operation                           | `reference-transaction` (guard)            | `update-embedded-repos` (update)                |
-| ----------------------------------- | ------------------------------------------ | ----------------------------------------------- |
-| `git checkout <ref>`                | Refuses if any child is dirty              | Updates children to new pins                    |
-| `git switch <branch>`               | Refuses if any child is dirty              | Updates children to new pins                    |
-| `git reset --hard <commit>`         | Refuses if any child is dirty              | **Gap** — does not fire `post-*` hooks          |
-| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves) | Does not fire `post-*` hooks (HEAD-only change) |
-| `git pull` (fast-forward)           | Refuses if any child is dirty              | Updates children                                |
-| `git pull --rebase`                 | Refuses at each rebase step                | Updates children after rebase completes         |
-| `git merge <commit>`                | Refuses if any child is dirty              | Updates children via `post-merge`               |
-| `git rebase`                        | Refuses at each step                       | Updates children via `post-rewrite`             |
-| `git bisect <good/bad/run>`         | Refuses if any child is dirty              | Updates children at each bisect step            |
-| `git cherry-pick`                   | Refuses if any child is dirty              | Updates children via `post-checkout`            |
-| `git stash pop`                     | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
-| `git commit`                        | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
-| `git checkout -- file`              | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
+| Operation                           | `reference-transaction` (guard)                                                        | `update-embedded-repos` (update)                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `git checkout <ref>`                | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git switch <branch>`               | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git reset --hard <commit>`         | Refuses if any child is dirty                                                          | **Gap** — does not fire `post-*` hooks               |
+| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves)                                             | Does not fire `post-*` hooks (HEAD-only change)      |
+| `git pull` (fast-forward)           | Refuses if any child is dirty                                                          | Updates children                                     |
+| `git pull --rebase`                 | Refuses at each rebase step                                                            | Updates children after rebase completes              |
+| `git merge <commit>`                | Refuses if any child is dirty                                                          | Updates children via `post-merge`                    |
+| `git rebase`                        | Refuses at each step                                                                   | Updates children via `post-rewrite`                  |
+| `git bisect <good/bad/run>`         | Refuses if any child is dirty                                                          | Updates children at each bisect step                 |
+| `git cherry-pick`                   | Refuses if any child is dirty                                                          | Updates children via `post-checkout`                 |
+| `git stash pop`                     | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
+| `git commit`                        | Refuses (precise: a dirty child it would re-pin; strict: any dirty child or stale pin) | Not updated (records current pins; no `post-*` hook) |
+| `git checkout -- file`              | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
 
 ## Comparison to standard submodules
 

@@ -13,10 +13,11 @@
  *   strict's all-clean + pins-current-on-append policy, and the drifted-child
  *   hole a naive pin-delta rule would miss.
  *
- * - pre-push (embedded.pushRecurse = check | off): parent pushes are rejected
- *   while a newly-pinned child commit is unreachable from the child's origin,
- *   allowed once the child is pushed, and unrelated (pin-less) pushes from a
- *   children-less clone stay allowed.
+ * - pre-push (embedded.pushRecurse = check | on-demand | off): parent pushes
+ *   are rejected while a newly-pinned child commit is unreachable from the
+ *   child's origin, allowed once the child is pushed (on-demand publishes the
+ *   child's branch to do that automatically), and unrelated (pin-less) pushes
+ *   from a children-less clone stay allowed.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -295,5 +296,24 @@ describe.skipIf(process.platform === "win32")("pre-push pin-publication check", 
 		const blocked = gitTry(["push", "--quiet", "origin", "main"], bareClone);
 		expect(blocked.status).not.toBe(0);
 		expect(blocked.stderr).toMatch(/not present/);
+	});
+
+	it("on-demand: an unpublished pin is auto-published by pushing the child branch, then the parent push passes", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["pre-push"] });
+		git(["config", "--local", "embedded.pushRecurse", "on-demand"], parent);
+		git(["push", "--quiet", "origin", "main"], parent); // initial: pin c1 already published
+
+		const c2 = childCommit(child, "c2"); // committed but NOT pushed to the child's origin
+		git(["add", "tests"], parent);
+		git(["commit", "-m", "bump pin to c2 (unpublished)"], parent);
+
+		// on-demand publishes the child's current branch (main, which contains c2)
+		// as a side effect, so the parent push is then allowed.
+		git(["push", "--quiet", "origin", "main"], parent); // would throw if blocked
+
+		// The child's c2 was pushed to its origin by the hook.
+		expect(git(["ls-remote", "origin", "main"], child).split(/\s/)[0]).toBe(c2);
+		// And the parent push landed.
+		expect(git(["ls-remote", "origin", "main"], parent).split(/\s/)[0]).toBe(git(["rev-parse", "HEAD"], parent));
 	});
 });
