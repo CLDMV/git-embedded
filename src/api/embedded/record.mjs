@@ -19,7 +19,15 @@ export default function record(opts = {}) {
 	const { paths = [] } = opts;
 
 	const root = self.git.getRepoRoot(cwd) || cwd;
-	const wantSet = paths.length ? new Set(paths) : null;
+	// Same filter-spelling normalization as restore/sync: gitlink paths from
+	// gitlinks() are root-relative with forward slashes, so accept "./tests",
+	// "tests/", and Windows "vendor\\foo" instead of silently not matching.
+	const normalizePath = (p) =>
+		String(p)
+			.replace(/\\/g, "/")
+			.replace(/^\.\/+/, "")
+			.replace(/\/+$/, "");
+	const wantSet = paths.length ? new Set(paths.map(normalizePath)) : null;
 
 	const links = self.embedded.gitlinks(root);
 	const results = [];

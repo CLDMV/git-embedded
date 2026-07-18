@@ -83,6 +83,24 @@ export default function restore(opts = {}) {
 		}
 
 		const absChild = path.resolve(root, childPath);
+
+		// lstat BEFORE probing for `.git` so a symlinked child is refused before
+		// anything follows it. A symlink that resolves to a real repo would
+		// otherwise satisfy the existsSync(.git) check below and be blessed as
+		// already-present — yet the packaged hooks cd into the child and would
+		// follow that link out of the parent worktree. lstat (not stat) sees the
+		// link itself, and also catches a broken symlink that existsSync misses.
+		let targetStat = null;
+		try {
+			targetStat = fs.lstatSync(absChild);
+		} catch {
+			/* missing — clone will create it */
+		}
+		if (targetStat && targetStat.isSymbolicLink()) {
+			results.push({ ...record, outcome: "unresolved", note: "target is a symbolic link — refusing to touch it" });
+			continue;
+		}
+
 		const hasGit = fs.existsSync(path.join(absChild, ".git"));
 		if (hasGit) {
 			results.push({ ...record, outcome: "already-present" });
@@ -90,21 +108,12 @@ export default function restore(opts = {}) {
 		}
 
 		// The only acceptable pre-existing target is an EMPTY, REAL directory —
-		// what a fresh parent clone materializes for a gitlink. A file, a
-		// directory with contents, or a SYMLINK (even to an empty dir — cloning
-		// through it would write outside the repo) is user data: never clone
-		// into it, never remove it. lstat so links are seen, not followed; this
-		// also catches a broken symlink, which existsSync would miss.
-		let targetStat = null;
-		try {
-			targetStat = fs.lstatSync(absChild);
-		} catch {
-			/* missing — clone will create it */
-		}
+		// what a fresh parent clone materializes for a gitlink. A file or a
+		// directory with contents is user data: never clone into it, never remove
+		// it. (A symlink was already refused above.)
 		if (targetStat) {
 			let refuse = null;
-			if (targetStat.isSymbolicLink()) refuse = "target is a symbolic link";
-			else if (!targetStat.isDirectory()) refuse = "target exists and is not a directory";
+			if (!targetStat.isDirectory()) refuse = "target exists and is not a directory";
 			else {
 				try {
 					if (fs.readdirSync(absChild).length > 0) refuse = "target directory is not empty";

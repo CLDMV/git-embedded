@@ -22,9 +22,10 @@ function git(args, opts = {}) {
  *   - on any other branch → `unregistered-branch`, left alone (reported).
  *   - detached and clean → detach to the pin.
  *
- * Only `pin-unavailable` (and an unexpected checkout failure, `sync-failed`)
- * make the exit code non-zero — the left-alone outcomes are deliberate
- * protection of in-progress work, not errors.
+ * Only `pin-unavailable` and `sync-failed` (an unexpected git failure — reading
+ * HEAD or status, the branch move, or the checkout) make the exit code
+ * non-zero; the left-alone outcomes are deliberate protection of in-progress
+ * work, not errors.
  *
  * @param {object} [opts]
  * @param {string} [opts.cwd] working directory inside the parent repo
@@ -73,14 +74,30 @@ export default function sync(opts = {}) {
 			continue;
 		}
 
-		const head = git(["-C", absChild, "rev-parse", "HEAD"]).stdout;
+		const headRes = git(["-C", absChild, "rev-parse", "HEAD"]);
+		if (headRes.code !== 0) {
+			results.push({
+				...record,
+				outcome: "sync-failed",
+				note: `could not read HEAD: ${headRes.stderr || `git rev-parse exited ${headRes.code}`}`
+			});
+			continue;
+		}
+		const head = headRes.stdout;
 		if (head === sha) {
 			results.push({ ...record, outcome: "in-sync" });
 			continue;
 		}
 
+		// A non-zero `git status` is a command failure (corrupt repo, permissions),
+		// not "uncommitted changes" — report it as sync-failed so the exit code is
+		// non-zero and stderr surfaces, instead of mislabeling it dirty.
 		const status = git(["-C", absChild, "status", "--porcelain"]);
-		if (status.code !== 0 || status.stdout) {
+		if (status.code !== 0) {
+			results.push({ ...record, outcome: "sync-failed", note: `git status failed: ${status.stderr || `exit ${status.code}`}` });
+			continue;
+		}
+		if (status.stdout) {
 			results.push({ ...record, outcome: "dirty", note: "pin moved but child has uncommitted changes — left alone" });
 			continue;
 		}

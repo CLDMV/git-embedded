@@ -313,6 +313,26 @@ describe("record / export round-trip", () => {
 		expect(results[0].url).toBe(childBare);
 		expect(api.embedded.registry.getUrl("tests", fresh)).toBe(childBare);
 	});
+
+	it("record normalizes './tests' and 'tests/' path filters to the gitlink path", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh }); // child present with origin wired
+		git(["config", "--local", "--unset", "embedded.tests.url"], fresh);
+
+		// './tests' previously missed the gitlink path ('tests') and silently
+		// recorded nothing; it must now match and record.
+		const dotSlash = api.embedded.record({ cwd: fresh, paths: ["./tests"] });
+		expect(dotSlash.results).toHaveLength(1);
+		expect(dotSlash.results[0].outcome).toBe("recorded");
+		expect(api.embedded.registry.getUrl("tests", fresh)).toBe(childBare);
+
+		// Trailing-slash spelling matches too.
+		git(["config", "--local", "--unset", "embedded.tests.url"], fresh);
+		const trailing = api.embedded.record({ cwd: fresh, paths: ["tests/"] });
+		expect(trailing.results[0].outcome).toBe("recorded");
+		expect(api.embedded.registry.getUrl("tests", fresh)).toBe(childBare);
+	});
 });
 
 describe("api.cli.link (empty-dir fix)", () => {
@@ -422,6 +442,28 @@ describe("review hardening round 2 (scp-root convention + symlink guards)", () =
 		expect(results[0].note).toMatch(/symbolic link.*refusing/);
 		expect(exitCode).toBe(1);
 		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
+	});
+
+	it.skipIf(!canSymlink)("restore refuses a symlinked child even when it resolves to a real repo with .git", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// A real child clone OUTSIDE the parent, symlinked in at the gitlink path:
+		// the link target has a .git, so the old .git-first check blessed it as
+		// already-present and skipped the symlink refusal. The packaged hooks
+		// would then cd through the link out of the parent worktree.
+		const outside = path.join(mkTmp(), "outside-child");
+		git(["clone", "--quiet", childBare, outside]);
+		expect(fs.existsSync(path.join(outside, ".git"))).toBe(true);
+		fs.rmdirSync(path.join(fresh, "tests"));
+		fs.symlinkSync(outside, path.join(fresh, "tests"), "dir");
+
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(results[0].outcome).toBe("unresolved");
+		expect(results[0].note).toMatch(/symbolic link.*refusing/);
+		expect(exitCode).toBe(1);
+		// Never adopted as already-present; the link and its target stay intact.
+		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
+		expect(fs.existsSync(path.join(outside, ".git"))).toBe(true);
 	});
 
 	it.skipIf(!canSymlink)("link refuses a symlink target up-front with exit 2", () => {
@@ -746,6 +788,33 @@ describe("api.embedded.sync (day-2 pin sync)", () => {
 		const asked = api.embedded.sync({ cwd: fresh, paths: ["tests"] });
 		expect(asked.results[0].outcome).toBe("no-repo");
 		expect(asked.exitCode).toBe(0);
+	});
+
+	it("reports sync-failed (non-zero) when reading the child's HEAD fails", () => {
+		const { parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+		const child = path.join(fresh, "tests");
+		// Point HEAD at a ref that does not exist so `git rev-parse HEAD` errors —
+		// a git failure, not "uncommitted changes" and not "not at pin".
+		fs.writeFileSync(path.join(child, ".git", "HEAD"), "ref: refs/heads/corrupt-gone");
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(results[0].outcome).toBe("sync-failed");
+		expect(exitCode).toBe(1);
+	});
+
+	it("reports sync-failed for a git status failure instead of mislabeling it dirty", () => {
+		const { work, parentBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		api.embedded.restore({ cwd: fresh });
+		const sha2 = advanceChild(work, "tests", "v2");
+		bumpPin(fresh, "tests", sha2); // HEAD != pin, so status is consulted
+		const child = path.join(fresh, "tests");
+		// Corrupt the index so `git status` errors while HEAD still reads fine.
+		fs.writeFileSync(path.join(child, ".git", "index"), "not a valid git index");
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(results[0].outcome).toBe("sync-failed");
+		expect(exitCode).toBe(1);
 	});
 });
 
