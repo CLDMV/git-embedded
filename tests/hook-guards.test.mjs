@@ -246,6 +246,40 @@ describe.skipIf(process.platform === "win32")("reference-transaction guard modes
 		expect(blocked.stderr).toMatch(/would re-pin/);
 		expect(blocked.stderr).toContain("my tests"); // full path, not split on the space
 	});
+
+	it("strict: a newly-initialized (unborn) child is skipped, not blocked", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["reference-transaction"] });
+		git(["config", "--local", "embedded.guard", "strict"], parent);
+		// Re-init the child so it has a valid but UNBORN HEAD (no commits yet).
+		fs.rmSync(path.join(child, ".git"), { recursive: true, force: true });
+		git(["init", "-b", "main", child]);
+		fs.writeFileSync(path.join(parent, "README.md"), "v2");
+		git(["add", "README.md"], parent);
+		git(["commit", "-m", "docs"], parent); // would throw if blocked
+		expect(git(["log", "--oneline", "-1"], parent)).toContain("docs");
+	});
+
+	it("strict: a child with an unreadable/corrupt HEAD fails closed", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["reference-transaction"] });
+		git(["config", "--local", "embedded.guard", "strict"], parent);
+		// Corrupt HEAD so neither rev-parse nor symbolic-ref can resolve it.
+		fs.writeFileSync(path.join(child, ".git", "HEAD"), "not a ref and not a sha\n");
+		fs.writeFileSync(path.join(parent, "README.md"), "v2");
+		git(["add", "README.md"], parent);
+		const blocked = gitTry(["commit", "-m", "docs"], parent);
+		expect(blocked.status).not.toBe(0);
+		expect(blocked.stderr).toMatch(/cannot read HEAD/);
+	});
+
+	it("precise: a child with an unreadable HEAD is skipped (does not block)", () => {
+		const { parent, child } = makeGuardedParent({ hooks: ["reference-transaction"] });
+		// precise is the default; corrupt the child HEAD.
+		fs.writeFileSync(path.join(child, ".git", "HEAD"), "not a ref and not a sha\n");
+		fs.writeFileSync(path.join(parent, "README.md"), "v2");
+		git(["add", "README.md"], parent);
+		git(["commit", "-m", "docs"], parent); // would throw if blocked
+		expect(git(["log", "--oneline", "-1"], parent)).toContain("docs");
+	});
 });
 
 describe.skipIf(process.platform === "win32")("pre-push pin-publication check", () => {
