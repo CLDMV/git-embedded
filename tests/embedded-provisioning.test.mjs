@@ -183,6 +183,27 @@ describe("api.embedded.restore (convention)", () => {
 		expect(again.exitCode).toBe(0);
 	});
 
+	it("resolves a RELATIVE registry url against the parent repo root, not the process cwd", () => {
+		// childBareName differs from the gitlink path so convention CANNOT resolve —
+		// the relative registry url is the only resolver, isolating the clone anchor.
+		const { parentBare, childBare, childSha } = makeParent({ gitlinkPath: "tests", childBareName: "secret-rel" });
+		const fresh = freshClone(parentBare);
+		// Store the child URL as a path RELATIVE to the parent repo root. Anchoring
+		// the clone to root makes this resolve deterministically; without the anchor
+		// git resolves it against the Node process CWD (the test runner) and the
+		// clone fails → the child would come back unresolved.
+		const relUrl = path.relative(fresh, childBare);
+		expect(path.isAbsolute(relUrl)).toBe(false);
+		api.embedded.registry.setUrl("tests", relUrl, fresh);
+
+		const { results, exitCode } = api.embedded.restore({ cwd: fresh });
+		expect(exitCode).toBe(0);
+		const rec = results.find((r) => r.path === "tests");
+		expect(rec.outcome).toBe("restored");
+		expect(fs.existsSync(path.join(fresh, "tests", ".git"))).toBe(true);
+		expect(git(["rev-parse", "HEAD"], path.join(fresh, "tests"))).toBe(childSha);
+	});
+
 	it("honors --skip for a partial restore (skipped child does not fail the run)", () => {
 		const { parentBare } = makeParent({ gitlinkPath: "tests" });
 		const fresh = freshClone(parentBare);

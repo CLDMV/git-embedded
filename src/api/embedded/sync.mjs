@@ -174,10 +174,30 @@ export default function sync(opts = {}) {
 		if (branch) {
 			// The child LIVES on this branch (registry says so) — move the branch to
 			// the pin, fast-forward only: HEAD must be an ancestor of the pin.
-			// Commits beyond the pin are your work and stay untouched. With the pin
-			// object absent (dry run), ancestry is unknowable — keep the optimistic
-			// dry-run report.
-			const ancestor = pinPresent ? git(["-C", absChild, "merge-base", "--is-ancestor", "HEAD", sha]).code === 0 : true;
+			// Commits beyond the pin are your work and stay untouched.
+			// merge-base --is-ancestor exit codes: 0 = HEAD IS an ancestor of the pin
+			// (fast-forward), 1 = NOT an ancestor (real divergence — your work), and
+			// anything else (128) is a genuine git error (corrupt repo, missing
+			// objects). Only exit 1 means "ahead"; a 128 must surface as sync-failed,
+			// not be mislabeled as your work and silently left alone. With the pin
+			// object absent (dry run) ancestry is unknowable — stay optimistic like
+			// the rest of the dry-run path.
+			let ancestor;
+			if (pinPresent) {
+				const anc = git(["-C", absChild, "merge-base", "--is-ancestor", "HEAD", sha]);
+				if (anc.code !== 0 && anc.code !== 1) {
+					results.push({
+						...record,
+						branch,
+						outcome: "sync-failed",
+						note: `could not test ancestry: ${anc.stderr || `merge-base --is-ancestor exited ${anc.code}`}`
+					});
+					continue;
+				}
+				ancestor = anc.code === 0;
+			} else {
+				ancestor = true;
+			}
 			if (!ancestor) {
 				results.push({
 					...record,

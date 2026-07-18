@@ -159,7 +159,11 @@ export default function restore(opts = {}) {
 		const existedBefore = fs.existsSync(absChild);
 		// `--` ends option parsing: a URL from config/manifest/--base that starts
 		// with "-" must never be interpreted as a git option (e.g. --upload-pack).
-		const clone = git(["clone", "--quiet", "--", resolved.url, absChild]);
+		// cwd=root anchors a RELATIVE url (e.g. "../sibling.git") to the parent repo
+		// root, so a restore resolves the same regardless of where the caller ran
+		// from. Without it git resolves the url against the Node process CWD (the
+		// destination is absolute, so only the source url is affected).
+		const clone = git(["clone", "--quiet", "--", resolved.url, absChild], { cwd: root });
 		if (clone.code !== 0) {
 			if (fs.existsSync(absChild)) removeClone(absChild, existedBefore);
 			results.push({ ...record, outcome: "unresolved", note: `clone failed: ${clone.stderr || `exit ${clone.code}`}` });
