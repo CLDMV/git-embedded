@@ -11,6 +11,8 @@ function git(args, opts = {}) {
  * itself is never touched; pulling it first is the caller's step.
  *
  * Per child, in order:
+ *   - symlinked gitlink path → `sync-failed`, refusing to touch it (never run
+ *     git through a link out of the worktree — same guard as restore/link).
  *   - HEAD already at the pin → `in-sync` (done).
  *   - uncommitted changes → `dirty`, left alone (that's your work).
  *   - pin absent locally → one `git fetch origin`; still absent →
@@ -67,6 +69,24 @@ export default function sync(opts = {}) {
 		}
 
 		const absChild = path.resolve(root, childPath);
+
+		// Refuse a symlinked gitlink path before touching it: every git command
+		// below runs with `-C absChild`, so a symlink pointing outside the parent
+		// worktree would have us fetch/checkout out there — the same risk restore
+		// and link already refuse. lstat sees the link itself (existsSync follows
+		// it); a symlink here is always an anomaly, so surface it (non-zero exit)
+		// even on an unfiltered run.
+		let linkStat = null;
+		try {
+			linkStat = fs.lstatSync(absChild);
+		} catch {
+			/* missing — handled as no-repo below */
+		}
+		if (linkStat && linkStat.isSymbolicLink()) {
+			results.push({ ...record, outcome: "sync-failed", note: "gitlink path is a symbolic link — refusing to touch it" });
+			continue;
+		}
+
 		if (!fs.existsSync(path.join(absChild, ".git"))) {
 			// A missing child is restore's job, not sync's; report it only when the
 			// caller asked for this path explicitly (mirrors record's idiom).

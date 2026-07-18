@@ -816,6 +816,23 @@ describe("api.embedded.sync (day-2 pin sync)", () => {
 		expect(results[0].outcome).toBe("sync-failed");
 		expect(exitCode).toBe(1);
 	});
+
+	it.skipIf(!canSymlink)("refuses a symlinked gitlink path (sync-failed), never running git through the link", () => {
+		const { parentBare, childBare } = makeParent({ gitlinkPath: "tests" });
+		const fresh = freshClone(parentBare);
+		// Replace the materialized gitlink dir with a symlink to a repo OUTSIDE the
+		// parent worktree — sync must refuse, not fetch/checkout out there.
+		const outside = path.join(mkTmp(), "outside-child");
+		git(["clone", "--quiet", childBare, outside]);
+		fs.rmdirSync(path.join(fresh, "tests"));
+		fs.symlinkSync(outside, path.join(fresh, "tests"), "dir");
+
+		const { results, exitCode } = api.embedded.sync({ cwd: fresh });
+		expect(results[0].outcome).toBe("sync-failed");
+		expect(results[0].note).toMatch(/symbolic link.*refusing/);
+		expect(exitCode).toBe(1);
+		expect(fs.lstatSync(path.join(fresh, "tests")).isSymbolicLink()).toBe(true);
+	});
 });
 
 describe("filter-path normalization (review round 6)", () => {
