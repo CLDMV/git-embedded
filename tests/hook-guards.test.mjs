@@ -385,6 +385,16 @@ describe.skipIf(process.platform === "win32")("pre-push pin-publication check", 
 		expect(blocked.stderr).toContain("my tests");
 	});
 
+	it("check: a child whose gitlink path STARTS with a space passes when its pin is published (leading-space edge)", () => {
+		const { parent } = makeGuardedParent({ hooks: ["pre-push"], childPath: " leading" });
+		// Pin c1 is already on the child's origin, so this push must pass. A plain
+		// `read -r pin path` re-read strips the LEADING space, so verify_pin would
+		// look up "leading" (which doesn't exist) and falsely reject; the whole-line
+		// read preserves " leading" and the published pin verifies.
+		git(["push", "--quiet", "origin", "main"], parent); // would throw if blocked
+		expect(git(["ls-remote", "origin", "main"], parent)).not.toBe("");
+	});
+
 	it("check: a non-fast-forward push re-verifies the whole tip (a pin unchanged in the range but now unreachable is caught)", () => {
 		const { parent, child } = makeGuardedParent({ hooks: ["pre-push"] });
 		const c1 = git(["rev-parse", "HEAD"], child);

@@ -139,8 +139,18 @@ while read local_ref local_sha remote_ref remote_sha; do
         done < <(git ls-tree -r "$local_sha" 2>/dev/null)
     fi
 
-    # Verify each unique (path, pin) once.
-    while read -r pin path; do
+    # Verify each unique (path, pin) once. Read each line WHOLE (IFS= disables
+    # field-splitting), then split the pin off at the FIRST space: a plain
+    # `read -r pin path` strips a LEADING space from $path (default-IFS trims the
+    # last field's leading whitespace), so a gitlink dir whose name begins with a
+    # space would be looked up at the wrong location — and a trailing space would
+    # be dropped too. The pin is a fixed-width sha with no spaces, so the first
+    # space is always the pin/path boundary; everything after it (leading or
+    # trailing space included) is the path verbatim.
+    while IFS= read -r line; do
+        case "$line" in *" "*) ;; *) continue ;; esac # skip blank/malformed
+        pin=${line%% *}
+        path=${line#* }
         [ -n "$pin" ] && [ -n "$path" ] || continue
         case "$checked" in *"|$path=$pin|"*) continue ;; esac
         checked="$checked|$path=$pin|"
