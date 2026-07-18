@@ -210,7 +210,11 @@ export default function restore(opts = {}) {
 			const checkout = git(["-C", absChild, "checkout", "--quiet", "--detach", sha]);
 			if (checkout.code !== 0) {
 				removeClone(absChild, existedBefore);
-				results.push({ ...record, outcome: "pinned-mismatch", note: `could not check out ${sha.slice(0, 12)}; clone removed` });
+				results.push({
+					...record,
+					outcome: "pinned-mismatch",
+					note: `could not check out ${sha.slice(0, 12)}: ${checkout.stderr || `git checkout exited ${checkout.code}`}; clone removed`
+				});
 				continue;
 			}
 		}
