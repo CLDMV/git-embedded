@@ -55,7 +55,7 @@ export function infer(childDir, sha) {
 export function attach(childDir, branch, sha) {
 	const checkout = git(["-C", childDir, "checkout", "--quiet", "-B", branch, sha]);
 	if (checkout.code !== 0) return false;
-	git(["-C", childDir, "branch", `--set-upstream-to=origin/${branch}`, branch]);
+	git(["-C", childDir, "branch", `--set-upstream-to=origin/${branch}`, "--", branch]);
 	return true;
 }
 

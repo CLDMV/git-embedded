@@ -149,7 +149,16 @@ export default function sync(opts = {}) {
 		}
 		if (!pinPresent && dryRun) record.note = "pin not in the local object store — a real run would fetch origin first";
 
-		const branch = git(["-C", absChild, "branch", "--show-current"]).stdout || null;
+		const branchRes = git(["-C", absChild, "branch", "--show-current"]);
+		if (branchRes.code !== 0) {
+			results.push({
+				...record,
+				outcome: "sync-failed",
+				note: `could not read current branch: ${branchRes.stderr || `git branch --show-current exited ${branchRes.code}`}`
+			});
+			continue;
+		}
+		const branch = branchRes.stdout || null;
 		const registered = self.embedded.registry.getBranch(childPath, root);
 
 		if (branch && (!registered || branch !== registered)) {
