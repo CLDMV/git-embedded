@@ -67,7 +67,7 @@ on:
         description: "Only include even-numbered (LTS) Node.js major versions in the test matrix"
         type: boolean
         required: false
-        default: false
+        default: true
       package_manager:
         description: "Package manager (npm or yarn)"
         type: string
@@ -186,9 +186,13 @@ jobs:
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
       min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
-      # Full matrix on feature branches (catch per-version bugs pre-merge);
-      # LTS-only on master/main as the final confidence check / audit record.
-      lts_only_matrix: ${{ github.event.inputs.lts_only_matrix == 'true' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
+      # LTS-only matrix (even majors: 20, 22, 24, …) on every event. Odd majors
+      # (21, 23, …) are non-LTS interim releases, and the native-binding test
+      # toolchain (vitest 4 / rolldown / vite 8) excludes them via `engines`
+      # (`^20.19.0 || >=22.12.0`), so a "full matrix" on them only re-discovers a
+      # known toolchain gap ("Cannot find native binding") rather than a real
+      # per-version regression. workflow_dispatch can still opt out (set false).
+      lts_only_matrix: ${{ github.event.inputs.lts_only_matrix != 'false' }}
       package_manager: ${{ github.event.inputs.package_manager || 'npm' }}
       test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
       # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
