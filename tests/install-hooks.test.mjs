@@ -39,7 +39,7 @@ beforeAll(async () => {
 });
 
 describe("api.install.hooks", () => {
-	it("installs the four package hooks and skips foreign existing files", async () => {
+	it("installs the package hooks and skips foreign existing files", async () => {
 		const gitDir = mkTmp();
 		fs.mkdirSync(path.join(gitDir, "hooks"));
 		// Pre-existing foreign hook should be left alone.
@@ -51,11 +51,12 @@ describe("api.install.hooks", () => {
 		expect(installed).toContain("post-merge");
 		expect(installed).toContain("post-rewrite");
 		expect(installed).toContain("reference-transaction");
+		expect(installed).toContain("pre-push");
 		expect(installed).not.toContain("post-checkout");
 		const skipped = Array.from(out.skipped).map((s) => s.name);
 		expect(skipped).toContain("post-checkout");
 
-		for (const name of ["post-merge", "post-rewrite", "reference-transaction"]) {
+		for (const name of ["post-merge", "post-rewrite", "reference-transaction", "pre-push"]) {
 			const body = fs.readFileSync(path.join(gitDir, "hooks", name), "utf8");
 			expect(body.startsWith("#!/usr/bin/env bash")).toBe(true);
 			expect(body).toContain("git-embedded");
@@ -77,7 +78,7 @@ describe("api.install.hooks", () => {
 		await api.install.hooks("install", gitDir);
 		const entries = await api.log.read();
 		const ours = entries.filter((e) => e.op === "install-repo-hook" && e.path.startsWith(gitDir));
-		expect(ours.length).toBe(4);
+		expect(ours.length).toBe(5);
 		expect(fs.existsSync(api.log.path())).toBe(true);
 	});
 });
@@ -89,7 +90,7 @@ describe("api.install.hooks uninstall", () => {
 		fs.writeFileSync(path.join(gitDir, "hooks", "pre-commit"), "#!/bin/sh\necho foreign\n");
 		const out = await api.install.hooks("uninstall", gitDir);
 		const removed = Array.from(out.removed);
-		for (const hook of ["post-checkout", "post-merge", "post-rewrite", "reference-transaction"]) {
+		for (const hook of ["post-checkout", "post-merge", "post-rewrite", "reference-transaction", "pre-push"]) {
 			expect(removed).toContain(hook);
 		}
 		expect(fs.existsSync(path.join(gitDir, "hooks", "pre-commit"))).toBe(true);
