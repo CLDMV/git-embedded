@@ -1,54 +1,155 @@
 #!/usr/bin/env bash
 # reference-transaction
 #
-# Refuses HEAD-moving git operations if any embedded git repo in the parent's
-# tree has uncommitted changes. Without this, a `git checkout B` in the parent
-# would silently leave the child stale (with the post-checkout updater unable
-# to update over dirty state), producing a confusing inconsistent state.
+# Guards HEAD-moving git operations against harming embedded child repos.
+# The companion update-embedded-repos hook (post-checkout/-merge/-rewrite)
+# force-syncs every child to the pin recorded in the parent's new HEAD; this
+# hook refuses, up-front, the moves where that sync (or the move itself)
+# would confuse or destroy in-flight child work.
 #
-# Requires git 2.28+ (released July 2020, when reference-transaction was
-# introduced).
+# IMPORTANT PLUMBING FACT: a plain `git commit` moves the ref HEAD points to,
+# reported in the reference transaction as HEAD (git <=2.43) or as the branch
+# ref refs/heads/<branch> (git 2.54+) — the guard watches BOTH. Either way,
+# "HEAD moved" alone cannot distinguish a commit from a checkout, so the mode
+# logic below reasons about what the move would actually DO to each child, and
+# classifies append-vs-jump by commit parentage where it matters.
 #
-# Phases (passed as $1 by git):
-#   - prepared:  updates queued, not yet applied. Exiting non-zero ABORTS the
-#                transaction. This is the only phase we act on.
-#   - committed: updates already applied (informational; we ignore).
-#   - aborted:   updates rejected by some other handler (informational).
+# Mode (git config embedded.guard — local overrides global; default precise):
+#   precise  Block only when a DIRTY child's HEAD differs from the pin in the
+#            NEW commit — i.e. exactly when update-embedded-repos would try to
+#            move a child that has uncommitted changes. Clean children, and
+#            dirty children whose pin already equals their HEAD (the sync
+#            no-ops), never block.
+#   strict   The everything-synced policy. Any dirty child blocks any HEAD
+#            move. Additionally, on APPENDS (commit/merge/cherry-pick — the
+#            new commit lists the old HEAD among its parents) every child's
+#            pin in the new commit must equal that child's current HEAD, so a
+#            parent commit can never ship stale pins. Jumps (checkout/reset)
+#            only require all-clean: their pins are EXPECTED to differ, and
+#            the post-hook sync moves the (clean) children afterwards.
+#   off      No guarding.
 #
-# The hook reads proposed ref updates from stdin, one per line:
-#   <old_sha> <new_sha> <ref-name>
+# One-shot override:  git -c embedded.guard=<mode> <command>
 #
-# We filter to HEAD updates with old != new (an actual HEAD move). Other ref
-# updates (branch fast-forwards from fetch, stash refs, tag creation, etc.)
-# don't touch the working tree and shouldn't be guarded.
-
-# Only the 'prepared' phase can reject the transaction.
+# Requires git 2.28+ (reference-transaction hook).
+#
+# Phases (passed as $1 by git): only 'prepared' can reject the transaction.
 [ "$1" = "prepared" ] || exit 0
 
-# Detect whether any update in this transaction moves HEAD.
-moving_head=0
+guard_mode=$(git config --get embedded.guard 2>/dev/null)
+case "$guard_mode" in
+off) exit 0 ;;
+strict | precise) ;;
+*) guard_mode="precise" ;;
+esac
+
+# Anchor every git command we run INSIDE a child to the child's own repo:
+# GIT_CEILING_DIRECTORIES stops repo discovery from walking UP into this parent,
+# so a child with a broken/corrupt .git fails cleanly here (empty HEAD, no
+# symref) instead of silently resolving the PARENT repo's HEAD.
+parent_root=$(pwd)
+child_git() (
+    cd "$1" 2>/dev/null || return 1
+    shift
+    GIT_CEILING_DIRECTORIES="$parent_root" git "$@"
+)
+
+# Detect a HEAD move and capture its endpoints. Stdin lines:
+#   <old_sha> <new_sha> <ref-name>
+# Other ref updates (fetch fast-forwards, stash refs, tags) don't touch the
+# working tree and aren't guarded.
+zeros="0000000000000000000000000000000000000000"
+# The ref a working-tree HEAD move touches is either literal HEAD (a detached
+# checkout, or a commit on a detached HEAD) or — when HEAD is on a branch — the
+# BRANCH ref HEAD points to. git <=2.43 emitted a redundant HEAD line for a
+# commit, so matching "HEAD" alone sufficed; git 2.54 emits ONLY the branch ref
+# (refs/heads/<branch>) for a commit, so without also matching the current
+# branch every commit slips past the guard. Resolve HEAD's branch and watch both.
+head_ref=$(git symbolic-ref --quiet HEAD 2>/dev/null)
+moving=0
+old_head=""
+new_head=""
 while read old_sha new_sha ref; do
-    [ "$ref" = "HEAD" ] || continue
+    [ "$ref" = "HEAD" ] || { [ -n "$head_ref" ] && [ "$ref" = "$head_ref" ]; } || continue
     [ "$old_sha" = "$new_sha" ] && continue
-    moving_head=1
+    moving=1
+    old_head=$old_sha
+    new_head=$new_sha
 done
+[ "$moving" = "1" ] || exit 0
+[ -n "$new_head" ] && [ "$new_head" != "$zeros" ] || exit 0
 
-# Nothing to check if HEAD is not moving.
-[ "$moving_head" = "1" ] || exit 0
+# Append vs jump (strict mode only cares): an append's new commit lists the
+# CURRENT (pre-move) HEAD among its parents — commit, merge, cherry-pick step.
+# The pre-move HEAD is resolved directly rather than trusting the transaction
+# line's old value: a checkout-to-SHA (detach) reports its HEAD line with the
+# null SHA on the old side, which must NOT read as "initial commit". An unborn
+# HEAD (the real initial commit) counts as an append. Known edge: switching to
+# a branch whose tip is a direct child of the current HEAD is indistinguishable
+# from a commit by parentage and is treated as an append; in strict mode use
+# `git -c embedded.guard=precise checkout …` if that blocks a legitimate move.
+is_append=0
+current_head=$(git rev-parse -q --verify "HEAD^{commit}" 2>/dev/null)
+if [ -z "$current_head" ]; then
+    is_append=1
+else
+    for parent in $(git rev-list --parents -n 1 "$new_head" 2>/dev/null | cut -d' ' -f2-); do
+        [ "$parent" = "$current_head" ] && is_append=1
+    done
+fi
 
-# Walk every gitlink in the current HEAD and check for dirty state.
-# A gitlink is a tree entry with type 'commit' (mode 160000). The path is
-# the directory in the parent's working tree that holds the embedded repo.
-while read mode type sha path; do
-    [ "$type" = "commit" ] || continue
+# Walk every gitlink in the NEW commit — those pins are what the post-hook
+# sync will enforce after the move. Tree entries from `git ls-tree -r`:
+#   <mode> SP <type> SP <sha> TAB <path>
+block=0
+# Split ls-tree output on the TAB so a child path containing spaces stays intact
+# (the meta side, `<mode> <type> <sha>`, is space-separated and re-split below).
+while IFS=$'\t' read -r meta path; do
+    set -- $meta
+    entry_type=$2
+    pin=$3
+    [ "$entry_type" = "commit" ] || continue
     [ -d "$path/.git" ] || [ -f "$path/.git" ] || continue
 
-    # Refuse if there are uncommitted changes inside the embedded repo.
-    if ! (cd "$path" && git diff-index --quiet HEAD --) 2>/dev/null; then
-        echo "git-embedded: ✗ $path has uncommitted changes" >&2
-        echo "  commit or stash inside $path/ before moving HEAD here" >&2
-        exit 1
+    # --verify: fail cleanly with EMPTY stdout when HEAD can't resolve (plain
+    # `rev-parse HEAD` echoes the literal "HEAD" on an unborn branch, which would
+    # slip past the emptiness check below and be misread as a dirty child).
+    child_head=$(child_git "$path" rev-parse --verify HEAD 2>/dev/null)
+    if [ -z "$child_head" ]; then
+        # HEAD is unreadable. Distinguish a legitimately UNBORN child (fresh
+        # `git init`, no commits yet — HEAD is still a valid symref to a branch)
+        # from a genuinely broken/corrupt repo (neither a commit nor a symref
+        # resolves). An unborn child has nothing to guard, so skip it. In strict
+        # mode, fail closed on a broken one rather than silently waving it through;
+        # precise stays lenient and skips either way.
+        if [ "$guard_mode" = "strict" ] && ! child_git "$path" symbolic-ref --quiet HEAD >/dev/null 2>&1; then
+            echo "git-embedded: ✗ $path — cannot read HEAD (missing or corrupt repo?) (embedded.guard=strict)" >&2
+            echo "  fix or re-restore the child at '$path'/, or bypass once with -c embedded.guard=off" >&2
+            block=1
+        fi
+        continue
     fi
-done < <(git ls-tree -r HEAD 2>/dev/null)
+    dirty=0
+    child_git "$path" diff-index --quiet HEAD -- 2>/dev/null || dirty=1
 
+    if [ "$guard_mode" = "strict" ]; then
+        if [ "$dirty" = "1" ]; then
+            echo "git-embedded: ✗ $path has uncommitted changes (embedded.guard=strict)" >&2
+            echo "  commit or stash inside '$path'/ before moving HEAD here" >&2
+            block=1
+        elif [ "$is_append" = "1" ] && [ "$child_head" != "$pin" ]; then
+            echo "git-embedded: ✗ $path is not synced: pin ${pin:0:12} != child HEAD ${child_head:0:12} (embedded.guard=strict)" >&2
+            echo "  record the child's current commit (git add -- '$path') or move the child to the pin before committing the parent" >&2
+            block=1
+        fi
+    else # precise
+        if [ "$dirty" = "1" ] && [ "$child_head" != "$pin" ]; then
+            echo "git-embedded: ✗ $path has uncommitted changes and this move would re-pin it (${child_head:0:12} → ${pin:0:12})" >&2
+            echo "  commit or stash inside '$path'/ before moving HEAD here" >&2
+            block=1
+        fi
+    fi
+done < <(git ls-tree -r "$new_head" 2>/dev/null)
+
+[ "$block" = "1" ] && exit 1
 exit 0

@@ -78,23 +78,39 @@ The detached-HEAD checkout matches standard submodule behavior: parents pin spec
 - `git reset --hard <commit>` updates the index and working tree but does **not** fire `post-checkout`, `post-merge`, or `post-rewrite`. The `reference-transaction` guard catches this case at the prepared phase (because `reset` does move HEAD via a ref transaction), so a `--hard` reset with a dirty child is refused — but a `--hard` reset with a clean child completes without the children being auto-updated. The mitigation is `git embedded sync` (see [Day-2 pin sync](#day-2-pin-sync)), which snaps clean children to the pins on demand.
 - `git stash pop` modifies the working tree without moving HEAD. It does not affect embedded children (stash entries are recorded in the parent's stash ref, not in the children), but anyone expecting "all working-tree-modifying commands are guarded" will not see consistency here.
 
+### `pre-push` (pin publication check)
+
+**Purpose.** Refuse to push parent commits whose gitlink pins reference child commits that are not reachable from the child's own origin. Without this, a parent that pins a committed-but-unpushed child publishes a dangling pointer: every other machine's `git embedded restore` fails on that child with `pinned-mismatch`, because the child's origin has never seen the commit. The dirty-state guard cannot catch this — a committed-but-unpushed child is clean.
+
+This is git-embedded's analog of `git push --recurse-submodules=check`; stock git cannot provide it here because that machinery locates children via `.gitmodules` registration, which anonymous gitlinks deliberately omit — the same registration gap the other hooks close for checkout.
+
+**Mechanism.** For each pushed ref, the hook collects the gitlink pins the remote is about to learn: the pins _changed_ by each commit new to the remote (`git diff-tree`, cheap), plus — only when the remote ref is being _created_ — every gitlink in the tip's tree. Each unique `(path, pin)` is verified inside the child working copy: reachable from some `refs/remotes/origin/*` tip, with one `git fetch origin` refresh on a miss so stale tracking refs don't produce false rejections. A pin change for a child that is not present in the working tree is rejected (it cannot be verified). Because only _newly-introduced_ pins are checked on existing-ref updates, a clone that never restored its children can still push commits that touch no pin.
+
+**Modes** (`git config embedded.pushRecurse`, local over global):
+
+- `check` _(default)_ — reject the push with a "push the child first" message.
+- `on-demand` — first try to publish the pin by pushing the child's CURRENT branch (only when that branch contains the pin and the child is not detached), then fall back to `check`'s rejection. Opt-in because implicitly pushing a child branch as a side effect of a parent push is surprising.
+- `off` — no verification.
+
+One-shot override: `git -c embedded.pushRecurse=<mode> push …`.
+
 ## Coverage matrix
 
-| Operation                           | `reference-transaction` (guard)            | `update-embedded-repos` (update)                |
-| ----------------------------------- | ------------------------------------------ | ----------------------------------------------- |
-| `git checkout <ref>`                | Refuses if any child is dirty              | Updates children to new pins                    |
-| `git switch <branch>`               | Refuses if any child is dirty              | Updates children to new pins                    |
-| `git reset --hard <commit>`         | Refuses if any child is dirty              | **Gap** — run `git embedded sync` after         |
-| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves) | Does not fire `post-*` hooks (HEAD-only change) |
-| `git pull` (fast-forward)           | Refuses if any child is dirty              | Updates children                                |
-| `git pull --rebase`                 | Refuses at each rebase step                | Updates children after rebase completes         |
-| `git merge <commit>`                | Refuses if any child is dirty              | Updates children via `post-merge`               |
-| `git rebase`                        | Refuses at each step                       | Updates children via `post-rewrite`             |
-| `git bisect <good/bad/run>`         | Refuses if any child is dirty              | Updates children at each bisect step            |
-| `git cherry-pick`                   | Refuses if any child is dirty              | Updates children via `post-checkout`            |
-| `git stash pop`                     | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
-| `git commit`                        | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
-| `git checkout -- file`              | Not guarded (no HEAD move)                 | Not updated (no HEAD move; not needed)          |
+| Operation                           | `reference-transaction` (guard)                                                        | `update-embedded-repos` (update)                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `git checkout <ref>`                | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git switch <branch>`               | Refuses if any child is dirty                                                          | Updates children to new pins                         |
+| `git reset --hard <commit>`         | Refuses if any child is dirty                                                          | **Gap** — run `git embedded sync` after              |
+| `git reset --soft/--mixed <commit>` | Refuses if any child is dirty (HEAD moves)                                             | Does not fire `post-*` hooks (HEAD-only change)      |
+| `git pull` (fast-forward)           | Refuses if any child is dirty                                                          | Updates children                                     |
+| `git pull --rebase`                 | Refuses at each rebase step                                                            | Updates children after rebase completes              |
+| `git merge <commit>`                | Refuses if any child is dirty                                                          | Updates children via `post-merge`                    |
+| `git rebase`                        | Refuses at each step                                                                   | Updates children via `post-rewrite`                  |
+| `git bisect <good/bad/run>`         | Refuses if any child is dirty                                                          | Updates children at each bisect step                 |
+| `git cherry-pick`                   | Refuses if any child is dirty                                                          | Updates children via `post-checkout`                 |
+| `git stash pop`                     | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
+| `git commit`                        | Refuses (precise: a dirty child it would re-pin; strict: any dirty child or stale pin) | Not updated (records current pins; no `post-*` hook) |
+| `git checkout -- file`              | Not guarded (no HEAD move)                                                             | Not updated (no HEAD move; not needed)               |
 
 ## Comparison to standard submodules
 
@@ -148,15 +164,15 @@ One implementation detail is load-bearing: containing branches are listed with *
 
 The hooks update children when a parent operation moves HEAD, but they detach (standard submodule semantics), require installation, and have the `git reset --hard` gap. `git embedded sync` is the explicit, branch-preserving alternative: after the parent has pulled new pins (pulling the parent is the caller's step — sync, like restore, never touches the parent), it walks the present children and moves each clean one to its pin. The dispositions, in evaluation order:
 
-| Child state                                     | Disposition                                                                                                          |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| HEAD already at the pin                         | `in-sync` — nothing to do                                                                                             |
-| Uncommitted changes                             | `dirty` — left alone (your work)                                                                                      |
-| Pin absent after one `git fetch origin`         | `pin-unavailable` — reported, non-zero exit                                                                           |
-| On the **registered** branch, HEAD ancestor of pin | `synced` — branch moved to the pin (`checkout -B`, fast-forward only), upstream refreshed                          |
-| On the registered branch, commits beyond the pin | `ahead` — left alone (your work)                                                                                     |
-| On any **unregistered** branch                  | `unregistered-branch` — left alone (reported)                                                                         |
-| Detached, clean                                 | `synced` — detached to the pin                                                                                        |
+| Child state                                        | Disposition                                                                               |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| HEAD already at the pin                            | `in-sync` — nothing to do                                                                 |
+| Uncommitted changes                                | `dirty` — left alone (your work)                                                          |
+| Pin absent after one `git fetch origin`            | `pin-unavailable` — reported, non-zero exit                                               |
+| On the **registered** branch, HEAD ancestor of pin | `synced` — branch moved to the pin (`checkout -B`, fast-forward only), upstream refreshed |
+| On the registered branch, commits beyond the pin   | `ahead` — left alone (your work)                                                          |
+| On any **unregistered** branch                     | `unregistered-branch` — left alone (reported)                                             |
+| Detached, clean                                    | `synced` — detached to the pin                                                            |
 
 Only `pin-unavailable` (and an unexpected checkout failure, `sync-failed`) make the exit code non-zero: the left-alone outcomes are deliberate protection of in-progress work, not errors. A dry run classifies without fetching or moving anything — with the pin not yet in the local object store it reports optimistically (like restore's dry run) and says a real run would fetch.
 
