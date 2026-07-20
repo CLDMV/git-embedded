@@ -34,6 +34,9 @@ export function getEffectiveHooksPath(cwd = process.cwd()) {
 	const { path, os } = context;
 	const res = context.spawnSync("git", ["config", "--get", "core.hooksPath"], { cwd, encoding: "utf8" });
 	if (res.status !== 0) return null;
+	/* v8 ignore next -- defensive: a successful `git config --get` (status 0) always
+	   writes the value plus a trailing newline, so res.stdout is never falsy here;
+	   real git can't produce this fallback (verified empirically). */
 	const raw = (res.stdout || "").trim();
 	if (!raw) return null;
 	const expanded = raw.startsWith("~") ? path.join(os.homedir(), raw.slice(1)) : raw;

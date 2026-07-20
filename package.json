@@ -68,9 +68,9 @@
 	"scripts": {
 		"start": "node bin/git-embedded.mjs",
 		"build:ci": "echo '✓ no build step'",
-		"test": "vitest run --config .configs/vitest.config.mjs",
+		"test": "node tests/run-vitest.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
-		"coverage": "vitest run --coverage --config .configs/vitest.config.mjs",
+		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
 		"ci:coverage": "npm run coverage",
 		"lint": "eslint --config .configs/eslint.config.mjs .",
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
@@ -86,6 +86,7 @@
 		"marked-terminal": "^7.3.0"
 	},
 	"devDependencies": {
+		"@cldmv/vitest-runner": "^1.2.0",
 		"@eslint/js": "^9.18.0",
 		"@eslint/json": "^0.10.0",
 		"@eslint/markdown": "^6.2.2",

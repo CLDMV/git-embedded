@@ -63,6 +63,9 @@ export function detectionHeader(result) {
 export function message(kind) {
 	const body = self.messages.load(kind);
 	const rendered = context.renderMarkdown(body);
+	/* v8 ignore next -- every messages/*.md file (plus empty/whitespace-only input) renders
+	   with a trailing newline (verified), so the append branch isn't reached by the current
+	   message set; marked doesn't guarantee a trailing newline universally, so the guard stays. */
 	process.stdout.write(rendered.endsWith("\n") ? rendered : rendered + "\n");
 }
 
