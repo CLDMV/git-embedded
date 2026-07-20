@@ -14,6 +14,14 @@ export default defineConfig({
 		environment: "node",
 		testTimeout: 30000,
 		server: { deps: { inline: [/@cldmv\/slothlet/] } },
+		// "dot" keeps CI logs to one character per test file instead of a full
+		// "RUN vX.Y.Z" + per-file pass/fail block for every file — vitest's
+		// non-interactive fallback (no TTY to redraw) otherwise reprints that
+		// whole block per file on top of the final aggregate summary, which
+		// dominates the log on a suite this size. The final "Test Files X
+		// passed" / "Tests Y passed" summary is unaffected — every built-in
+		// reporter prints it regardless of per-test verbosity.
+		reporters: ["dot"],
 		coverage: {
 			provider: "v8",
 			include: ["src/**"],
