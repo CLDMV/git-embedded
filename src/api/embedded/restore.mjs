@@ -168,7 +168,7 @@ export default function restore(opts = {}) {
 		const clone = git(["clone", "--quiet", "--", resolved.url, absChild], { cwd: root });
 		if (clone.code !== 0) {
 			if (fs.existsSync(absChild)) removeClone(absChild, existedBefore);
-			/* v8 ignore next -- defensive: git writes to stderr on a clone failure, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+			/* v8 ignore next -- git normally writes to stderr on a clone failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 			results.push({ ...record, outcome: "unresolved", note: `clone failed: ${clone.stderr || `exit ${clone.code}`}` });
 			continue;
 		}
@@ -180,9 +180,9 @@ export default function restore(opts = {}) {
 		let fetchErr = null;
 		if (!present) {
 			const fetch = git(["-C", absChild, "fetch", "--quiet", "origin"]);
-			/* v8 ignore next -- defensive: the clone above just succeeded from this same
-			   origin (git stores it as an absolute path), so the immediate follow-up
-			   fetch cannot fail without the remote vanishing mid-call — unreachable. */
+			/* v8 ignore next -- the clone above just succeeded from this same origin (git
+			   stores it as an absolute path), so the follow-up fetch normally succeeds; a
+			   mid-call network failure (remote unreachable) is real but not reproducible in the suite. */
 			if (fetch.code !== 0) fetchErr = fetch.stderr || `git fetch exited ${fetch.code}`;
 			present = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
 		}
@@ -191,7 +191,7 @@ export default function restore(opts = {}) {
 			// A failed fetch (auth/network) is not the same as "wrong repo" — surface
 			// it so a pinned-mismatch isn't misread as a bad convention guess.
 			const why = fetchErr
-				? /* v8 ignore next -- defensive: fetchErr is only set on the fetch-failure path above, which is itself unreachable. */
+				? /* v8 ignore next -- fetchErr is set only by the fetch-failure path above — a mid-call network failure, real but not reproducible in the suite */
 					`fetch from ${resolved.source} repo failed (${fetchErr})`
 				: `pinned ${sha.slice(0, 12)} absent in ${resolved.source} repo`;
 			results.push({
@@ -215,9 +215,9 @@ export default function restore(opts = {}) {
 		record.branch = attached ? branch : null;
 		if (!attached) {
 			const checkout = git(["-C", absChild, "checkout", "--quiet", "--detach", sha]);
-			/* v8 ignore start -- defensive: the pin was just SHA-verified present in this
-			   fresh clone, so a detached checkout of it cannot fail short of mid-call
-			   corruption — this failure path is unreachable. */
+			/* v8 ignore start -- the pin was just SHA-verified present in this fresh clone,
+			   so the detached checkout normally succeeds; an I/O error or mid-call corruption
+			   is real but not reproducible in the suite. */
 			if (checkout.code !== 0) {
 				removeClone(absChild, existedBefore);
 				results.push({

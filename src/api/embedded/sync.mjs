@@ -2,9 +2,9 @@ import { self, context } from "@cldmv/slothlet/runtime";
 
 function git(args, opts = {}) {
 	const res = context.spawnSync("git", args, { encoding: "utf8", ...opts });
-	/* v8 ignore next -- defensive: `res.status` is null only on spawn failure / signal
-	   kill; every git() call below runs after gitlinks() already proved git is
-	   spawnable, so the `?? 1` fallback is unreachable in sync. */
+	/* v8 ignore next -- res.status is null on spawn failure (git not on PATH) or signal kill —
+	   the real case `?? 1` maps to exit 1. git() runs after gitlinks() so git is normally
+	   spawnable, but a later spawn can still fail; it just isn't reproducible in the suite. */
 	return { code: res.status ?? 1, stdout: (res.stdout || "").trim(), stderr: (res.stderr || "").trim() };
 }
 
@@ -110,7 +110,7 @@ export default function sync(opts = {}) {
 			results.push({
 				...record,
 				outcome: "sync-failed",
-				/* v8 ignore next -- defensive: git writes to stderr on this failure, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+				/* v8 ignore next -- git normally writes to stderr on a rev-parse failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 				note: `could not read HEAD: ${headRes.stderr || `git rev-parse exited ${headRes.code}`}`
 			});
 			continue;
@@ -126,7 +126,7 @@ export default function sync(opts = {}) {
 		// non-zero and stderr surfaces, instead of mislabeling it dirty.
 		const status = git(["-C", absChild, "status", "--porcelain"]);
 		if (status.code !== 0) {
-			/* v8 ignore next -- defensive: git writes to stderr on a status failure, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+			/* v8 ignore next -- git normally writes to stderr on a status failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 			results.push({ ...record, outcome: "sync-failed", note: `git status failed: ${status.stderr || `exit ${status.code}`}` });
 			continue;
 		}
@@ -144,7 +144,7 @@ export default function sync(opts = {}) {
 			if (fetch.code !== 0) {
 				// A failed fetch (auth/network) is a real error, not "pin genuinely
 				// absent" — report sync-failed with stderr so it's actionable.
-				/* v8 ignore next -- defensive: git writes to stderr on a fetch failure, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+				/* v8 ignore next -- git normally writes to stderr on a fetch failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 				results.push({ ...record, outcome: "sync-failed", note: `git fetch origin failed: ${fetch.stderr || `exit ${fetch.code}`}` });
 				continue;
 			}
@@ -157,10 +157,10 @@ export default function sync(opts = {}) {
 		if (!pinPresent && dryRun) record.note = "pin not in the local object store — a real run would fetch origin first";
 
 		const branchRes = git(["-C", absChild, "branch", "--show-current"]);
-		/* v8 ignore start -- defensive: `git branch --show-current` cannot fail here —
-		   HEAD (rev-parse), the worktree (status), and the pin (cat-file) all already
-		   succeeded, and it neither locks the index nor inflates objects (verified: an
-		   index.lock leaves it exit 0), so this failure path is unreachable. */
+		/* v8 ignore start -- `git branch --show-current` normally succeeds here — HEAD
+		   (rev-parse), the worktree (status), and the pin (cat-file) already succeeded, and
+		   it neither locks the index nor inflates objects (an index.lock leaves it exit 0). A
+		   hard failure (I/O error, signal kill) is real but not reproducible in the suite. */
 		if (branchRes.code !== 0) {
 			results.push({
 				...record,
@@ -202,7 +202,7 @@ export default function sync(opts = {}) {
 						...record,
 						branch,
 						outcome: "sync-failed",
-						/* v8 ignore next -- defensive: git writes to stderr on a merge-base error, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+						/* v8 ignore next -- git normally writes to stderr on a merge-base error; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 						note: `could not test ancestry: ${anc.stderr || `merge-base --is-ancestor exited ${anc.code}`}`
 					});
 					continue;
@@ -242,7 +242,7 @@ export default function sync(opts = {}) {
 			results.push({
 				...record,
 				outcome: "sync-failed",
-				/* v8 ignore next -- defensive: git writes to stderr on a checkout failure, so the empty-stderr `|| exit N` fallback is unreachable (verified empirically). */
+				/* v8 ignore next -- git normally writes to stderr on a checkout failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 				note: `could not check out ${sha.slice(0, 12)}: ${checkout.stderr || `git checkout exited ${checkout.code}`}`
 			});
 			continue;
