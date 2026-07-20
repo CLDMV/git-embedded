@@ -48,13 +48,16 @@ jobs:
               uses: CLDMV/.github/.github/actions/git/jobs/audit-commit-subject@v4
               with:
                   commit_sha: ${{ github.sha }}
-                  # Allow release commits (from the release workflow), maintenance
-                  # commits, and standard merge commits. Customize per repo if
-                  # your conventions differ.
-                  allowed_patterns: |
-                      ^release: v\d+\.\d+\.\d+( \(#\d+\))?$
-                      ^chore(\([^)]+\))?: .+
-                      ^Merge pull request #\d+ from .+
+                  # allowed_patterns omitted -> inherit the canonical default from
+                  # audit-commit-subject (release/chore/merge patterns, including
+                  # the "release: vX.Y.Z - <description>" form). Customize only if
+                  # this repo's conventions genuinely differ — a hardcoded copy
+                  # here goes stale the next time the canonical default changes.
+                  # allowed_patterns: |
+                  #     ^release: v\d+\.\d+\.\d+( - .+?)?( \(#\d+\))?$
+                  #     ^chore(\([^)]+\))?: .+
+                  #     ^Merge pull request #\d+ from .+
+                  #     ^feat(\([^)]+\))?: .+
                   # Canonical label names from CLDMV/.github's data/github-labels.json
                   # (note the space after each colon). Replace with names that exist
                   # in your repo's label catalog.
