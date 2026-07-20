@@ -27,6 +27,7 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -219,8 +220,8 @@ beforeEach(() => {
 	originalEnv = { ...process.env };
 	originalCwd = process.cwd();
 	// Hermetic git: ignore host/global config, supply a commit identity.
-	process.env.GIT_CONFIG_GLOBAL = "/dev/null";
-	process.env.GIT_CONFIG_SYSTEM = "/dev/null";
+	process.env.GIT_CONFIG_GLOBAL = os.platform() === "win32" ? "NUL" : "/dev/null";
+	process.env.GIT_CONFIG_SYSTEM = os.platform() === "win32" ? "NUL" : "/dev/null";
 	process.env.GIT_AUTHOR_NAME = "test";
 	process.env.GIT_AUTHOR_EMAIL = "test@example.com";
 	process.env.GIT_COMMITTER_NAME = "test";

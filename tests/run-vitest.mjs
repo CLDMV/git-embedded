@@ -34,6 +34,10 @@ const coverageQuiet = forwarded.includes("--coverage-quiet");
 const coverage = coverageQuiet || forwarded.includes("--coverage");
 const passthrough = forwarded.filter((a) => a !== "--coverage" && a !== "--coverage-quiet");
 
+// VITEST_WORKERS overrides the worker count; ignore an unset / invalid / non-positive value.
+const parsedWorkers = parseInt(process.env.VITEST_WORKERS ?? "", 10);
+const workers = Number.isInteger(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : 4;
+
 const code = await run({
 	cwd: root,
 	testDir: "tests",
@@ -41,7 +45,7 @@ const code = await run({
 	// git-embedded uses the plain `*.test.mjs` convention rather than `*.test.vitest.mjs`.
 	testFilePattern: /\.test\.mjs$/,
 	testPatterns,
-	workers: process.env.VITEST_WORKERS ? parseInt(process.env.VITEST_WORKERS, 10) : 4,
+	workers,
 	coverageQuiet,
 	vitestArgs: [...(coverage ? ["--coverage"] : []), ...passthrough],
 	nodeEnv: process.env.NODE_ENV || "development"
