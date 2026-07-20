@@ -63,6 +63,10 @@ export function detectionHeader(result) {
 export function message(kind) {
 	const body = self.messages.load(kind);
 	const rendered = context.renderMarkdown(body);
+	/* v8 ignore next -- defensive: marked + marked-terminal always block-terminate
+	   real markdown with a trailing newline (verified against every messages/*.md
+	   file plus empty/whitespace-only input), so the append branch has no reachable
+	   real input. */
 	process.stdout.write(rendered.endsWith("\n") ? rendered : rendered + "\n");
 }
 

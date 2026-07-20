@@ -29,8 +29,13 @@ export default function gitlinks(cwd = process.cwd()) {
 		if (!line) continue;
 		// <mode> SP <type> SP <sha> TAB <path>
 		const tab = line.indexOf("\t");
+		/* v8 ignore next -- defensive: `git ls-tree -r HEAD` always emits
+		   `<mode> SP <type> SP <sha> TAB <path>`, so a non-empty line with no tab is
+		   unreachable (the empty-line case is already handled above). */
 		if (tab < 0) continue;
 		const meta = line.slice(0, tab).split(/\s+/);
+		/* v8 ignore next -- defensive: the pre-tab field is always exactly
+		   `<mode> <type> <sha>` (3 tokens) for `-r HEAD`, so fewer than 3 is unreachable. */
 		if (meta.length < 3) continue;
 		const [mode, type, sha] = meta;
 		if (mode !== "160000" || type !== "commit") continue;

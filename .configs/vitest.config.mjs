@@ -13,6 +13,7 @@ export default defineConfig({
 		exclude: ["node_modules", "reference/**"],
 		environment: "node",
 		testTimeout: 30000,
+		server: { deps: { inline: [/@cldmv\/slothlet/] } },
 		coverage: {
 			provider: "v8",
 			include: ["src/**"],

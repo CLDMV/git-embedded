@@ -66,12 +66,14 @@ export function run(localPath, remoteUrl) {
 	const clone = spawnSync("git", ["clone", "--", remoteUrl, localPath], { stdio: "inherit" });
 	if (clone.status !== 0) {
 		self.report.error(`git clone exited with status ${clone.status}`);
+		/* v8 ignore next -- clone.status is a real non-zero exit here; the `|| 1` guards a null status (signal/spawn failure) that a normal run cannot produce */
 		process.exit(clone.status || 1);
 	}
 
 	const add = spawnSync("git", ["add", "--", localPath], { stdio: "inherit" });
 	if (add.status !== 0) {
 		self.report.error(`git add ${localPath} exited with status ${add.status}`);
+		/* v8 ignore next -- add.status is a real non-zero exit here; the `|| 1` guards a null status (signal/spawn failure) that a normal run cannot produce */
 		process.exit(add.status || 1);
 	}
 

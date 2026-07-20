@@ -19,6 +19,7 @@ export async function run(opts = {}) {
 	if (cfg.status === 0) {
 		self.report.success("Silenced 'embedded git repository' advice (git config advice.addEmbeddedRepo=false).");
 	} else {
+		/* v8 ignore next -- git surfaces config failures on stderr; the `|| stdout` fallback is a defensive guard, unreachable via a real git failure */
 		self.report.warn(`Could not set git config advice.addEmbeddedRepo: ${cfg.stderr || cfg.stdout}`);
 	}
 }
