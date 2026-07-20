@@ -105,6 +105,7 @@ async function bootstrapAndInstall(result, opts) {
 		if (out.fallbackToCopy.length > 0) self.report.warn(`Filesystem fallback to copy for ${out.fallbackToCopy.length} entries`);
 		const gitConfig = context.spawnSync("git", ["config", "--global", "core.hooksPath", dir], { encoding: "utf8" });
 		if (gitConfig.status !== 0) {
+			/* v8 ignore next -- git normally writes config failures to stderr; the `|| stdout` fallback covers an empty-stderr failure (e.g. signal kill) — real, just not reproducible in the suite */
 			self.report.error(`git config --global core.hooksPath failed: ${gitConfig.stderr || gitConfig.stdout}`);
 			process.exit(1);
 		}

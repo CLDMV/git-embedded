@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/git-embedded",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Manage embedded git repositories (anonymous gitlinks) without .gitmodules. Provides hooks that restore standard git-command ergonomics for embedded children while keeping the child's origin URL out of the public parent repo.",
 	"type": "module",
 	"license": "Apache-2.0",
@@ -67,9 +67,11 @@
 	},
 	"scripts": {
 		"start": "node bin/git-embedded.mjs",
-		"test": "vitest run --config .configs/vitest.config.mjs",
+		"build:ci": "echo '✓ no build step'",
+		"test": "node tests/run-vitest.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
-		"coverage": "vitest run --coverage --config .configs/vitest.config.mjs",
+		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
+		"ci:coverage": "npm run coverage",
 		"lint": "eslint --config .configs/eslint.config.mjs .",
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
@@ -84,6 +86,7 @@
 		"marked-terminal": "^7.3.0"
 	},
 	"devDependencies": {
+		"@cldmv/vitest-runner": "^1.2.0",
 		"@eslint/js": "^9.18.0",
 		"@eslint/json": "^0.10.0",
 		"@eslint/markdown": "^6.2.2",

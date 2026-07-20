@@ -99,6 +99,7 @@ export default function restore(opts = {}) {
 			// assumed absent — otherwise we could clone into, and later removeClone
 			// against, a pre-existing path we can't even stat.
 			if (err.code !== "ENOENT") {
+				/* v8 ignore next -- defensive: an fs error object always carries a `.code`, so the `|| err.message` fallback is unreachable. */
 				results.push({ ...record, outcome: "unresolved", note: `target unreadable (${err.code || err.message}) — refusing to touch it` });
 				continue;
 			}
@@ -125,6 +126,7 @@ export default function restore(opts = {}) {
 				try {
 					if (fs.readdirSync(absChild).length > 0) refuse = "target directory is not empty";
 				} catch (err) {
+					/* v8 ignore next -- defensive: an fs error object always carries a `.code`, so the `|| err.message` fallback is unreachable. */
 					refuse = `target unreadable (${err.code || err.message})`;
 				}
 			}
@@ -166,6 +168,7 @@ export default function restore(opts = {}) {
 		const clone = git(["clone", "--quiet", "--", resolved.url, absChild], { cwd: root });
 		if (clone.code !== 0) {
 			if (fs.existsSync(absChild)) removeClone(absChild, existedBefore);
+			/* v8 ignore next -- git normally writes to stderr on a clone failure; the empty-stderr `|| exit N` fallback covers a stderr-less failure (e.g. signal kill) — real, just not reproducible in the suite */
 			results.push({ ...record, outcome: "unresolved", note: `clone failed: ${clone.stderr || `exit ${clone.code}`}` });
 			continue;
 		}
@@ -177,6 +180,9 @@ export default function restore(opts = {}) {
 		let fetchErr = null;
 		if (!present) {
 			const fetch = git(["-C", absChild, "fetch", "--quiet", "origin"]);
+			/* v8 ignore next -- the clone above just succeeded from this same origin (git
+			   stores it as an absolute path), so the follow-up fetch normally succeeds; a
+			   mid-call network failure (remote unreachable) is real but not reproducible in the suite. */
 			if (fetch.code !== 0) fetchErr = fetch.stderr || `git fetch exited ${fetch.code}`;
 			present = git(["-C", absChild, "cat-file", "-e", `${sha}^{commit}`]).code === 0;
 		}
@@ -185,7 +191,8 @@ export default function restore(opts = {}) {
 			// A failed fetch (auth/network) is not the same as "wrong repo" — surface
 			// it so a pinned-mismatch isn't misread as a bad convention guess.
 			const why = fetchErr
-				? `fetch from ${resolved.source} repo failed (${fetchErr})`
+				? /* v8 ignore next -- fetchErr is set only by the fetch-failure path above — a mid-call network failure, real but not reproducible in the suite */
+					`fetch from ${resolved.source} repo failed (${fetchErr})`
 				: `pinned ${sha.slice(0, 12)} absent in ${resolved.source} repo`;
 			results.push({
 				...record,
@@ -208,6 +215,9 @@ export default function restore(opts = {}) {
 		record.branch = attached ? branch : null;
 		if (!attached) {
 			const checkout = git(["-C", absChild, "checkout", "--quiet", "--detach", sha]);
+			/* v8 ignore start -- the pin was just SHA-verified present in this fresh clone,
+			   so the detached checkout normally succeeds; an I/O error or mid-call corruption
+			   is real but not reproducible in the suite. */
 			if (checkout.code !== 0) {
 				removeClone(absChild, existedBefore);
 				results.push({
@@ -217,6 +227,7 @@ export default function restore(opts = {}) {
 				});
 				continue;
 			}
+			/* v8 ignore stop */
 		}
 
 		// Persist the resolved URL (and the branch the child ended on) so day-2

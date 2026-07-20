@@ -100,8 +100,11 @@ export function makeCustomHelp(HelpClass, deps) {
 				for (const ex of examples) {
 					const colored = ex.replace(argPattern, (match, p1, p2, p3, p4) => {
 						if (p2) return color(chalk.magenta, match);
+						/* v8 ignore else -- defensive: argPattern's two alternatives each
+						   require 1+ chars in their capture group, so a successful match
+						   always sets p2 or p4; the else has no reachable real input. */
 						if (p4) return color(chalk.yellow, match);
-						return match;
+						else return match;
 					});
 					output.push(`  ${colored}`);
 				}
@@ -197,6 +200,9 @@ function getFullCommandChain(cmd) {
 function wrapTextWithHangingIndent(text, indent, label, labelColor, width) {
 	const pad = "  ".repeat(indent);
 	const prefix = "- ";
+	/* v8 ignore next -- defensive: both call sites (Aliases/Description below)
+	   always pass a non-empty literal label, and this private helper has no
+	   other caller, so the empty-label fallback has no reachable real input. */
 	const labelStr = label ? label + ": " : "";
 	const hangingPad = pad + " ".repeat(prefix.length + labelStr.length);
 	const maxWidth = (width || process.stdout.columns || 80) - (pad.length + prefix.length + labelStr.length);
