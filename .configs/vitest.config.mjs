@@ -16,7 +16,13 @@ export default defineConfig({
 		coverage: {
 			provider: "v8",
 			include: ["src/**"],
-			exclude: ["**/*.json", "tests/**"],
+			exclude: [
+				"**/*.json",
+				"tests/**",
+				// Windows-only elevation helpers — cannot execute on the Linux coverage runner.
+				"src/api/link/elevate-windows.mjs",
+				"src/lib/elevate-windows-child.mjs"
+			],
 			reporter: ["text", "html", "json-summary", "json"]
 		}
 	}
