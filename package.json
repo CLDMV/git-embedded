@@ -91,7 +91,7 @@
 		"@eslint/json": "^2.0.1",
 		"@eslint/markdown": "^6.2.2",
 		"@vitest/coverage-v8": "^4.1.10",
-		"eslint": "^9.18.0",
+		"eslint": "^10.8.0",
 		"globals": "^17.7.0",
 		"prettier": "^3.4.2",
 		"vitest": "^4.1.10"
