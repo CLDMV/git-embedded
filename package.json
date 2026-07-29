@@ -82,7 +82,7 @@
 		"@cldmv/slothlet": "^3.7.0",
 		"@cldmv/wisp": "^1.0.1",
 		"chalk": "^5.4.1",
-		"commander": "^14.0.0",
+		"commander": "^15.0.0",
 		"marked": "^15.0.12",
 		"marked-terminal": "^7.3.0"
 	},
