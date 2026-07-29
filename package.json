@@ -75,7 +75,8 @@
 		"lint": "eslint --config .configs/eslint.config.mjs .",
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
-		"format:check": "prettier --config .configs/.prettierrc --check ."
+		"format:check": "prettier --config .configs/.prettierrc --check .",
+		"build": "echo 'no build step - stopgap for CI coverage-badge; see tracking issue'"
 	},
 	"dependencies": {
 		"@cldmv/slothlet": "^3.7.0",
