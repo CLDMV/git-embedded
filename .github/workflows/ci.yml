@@ -54,10 +54,10 @@ on:
         required: false
         default: "lts/*"
       min_node_version:
-        description: "Minimum Node.js version for matrix testing (default: 20, oldest non-EOL)"
+        description: "Minimum Node.js version for matrix testing (default: 22, oldest non-EOL LTS)"
         type: string
         required: false
-        default: "20"
+        default: "22"
       max_node_major:
         description: "Override max Node.js major version (default: 22)"
         type: string
@@ -184,12 +184,12 @@ jobs:
         .gitignore
       debug: ${{ github.event.inputs.debug == 'true' }}
       node_version: ${{ github.event.inputs.node_version || 'lts/*' }}
-      min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
+      min_node_version: ${{ github.event.inputs.min_node_version || '22' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
-      # LTS-only matrix (even majors: 20, 22, 24, …) on every event. Odd majors
-      # (21, 23, …) are non-LTS interim releases, and the native-binding test
+      # LTS-only matrix (even majors: 22, 24, …) on every event. Odd majors
+      # (23, 25, …) are non-LTS interim releases, and the native-binding test
       # toolchain (vitest 4 / rolldown / vite 8) excludes them via `engines`
-      # (`^20.19.0 || >=22.12.0`), so a "full matrix" on them only re-discovers a
+      # (`>=22.12.0`), so a "full matrix" on them only re-discovers a
       # known toolchain gap ("Cannot find native binding") rather than a real
       # per-version regression. workflow_dispatch can still opt out (set false).
       lts_only_matrix: ${{ github.event.inputs.lts_only_matrix != 'false' }}
