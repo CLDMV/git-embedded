@@ -63,7 +63,7 @@ on:
         description: "Minimum Node.js version for matrix testing (enables matrix when set)"
         type: string
         required: false
-        default: "20"
+        default: "22"
       max_node_major:
         description: "Override max Node.js major version (default: 22)"
         type: string
@@ -101,7 +101,7 @@ jobs:
       publish_to_github_packages: ${{ github.event.inputs.publish_to_github_packages != 'false' }}
       publish_command: ""
       github_packages_publish_command: ""
-      min_node_version: ${{ github.event.inputs.min_node_version || '20' }}
+      min_node_version: ${{ github.event.inputs.min_node_version || '22' }}
       max_node_major: ${{ github.event.inputs.max_node_major || '22' }}
       test_command: "npm test" # Use defaults: NODE_ENV=development, NODE_OPTIONS=--conditions=development
       # test_command: "NODE_OPTIONS='--conditions=slothlet-dev' npm test"  # Override NODE_OPTIONS only
