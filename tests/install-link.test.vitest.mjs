@@ -1,6 +1,6 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/install-link.test.mjs
+ *	@Filename: /tests/install-link.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Behavior tests for the install-dispatch + link-batch layer, driven through

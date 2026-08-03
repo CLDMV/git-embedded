@@ -1,6 +1,6 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/detect-hooks.test.mjs
+ *	@Filename: /tests/detect-hooks.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Coverage tests for the hook-manager detectors and the detect orchestrator:
@@ -18,9 +18,9 @@
  *   bare / empty), system-scope hooksPath, init.templateDir fallback, and none.
  *
  * The detectors are pure-fs and are driven directly with fabricated
- * repoRoot/gitDir args (matching tests/detect-foreign.test.mjs). run() shells
+ * repoRoot/gitDir args (matching tests/detect-foreign.test.vitest.mjs). run() shells
  * out to real git, so it is driven against real temp repos with a hermetic git
- * environment (matching tests/embedded-provisioning.test.mjs).
+ * environment (matching tests/embedded-provisioning.test.vitest.mjs).
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";

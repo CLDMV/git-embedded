@@ -24,12 +24,12 @@ vi.mock("node:readline", () => ({
 /**
  * Coverage top-up for src/api/prompt.mjs, paths.mjs, git.mjs, report.mjs, and
  * src/api/commander/custom-help.mjs — closing the line/branch/function gaps
- * left after tests/helpers.test.mjs and tests/commander-help.test.mjs.
+ * left after tests/helpers.test.vitest.mjs and tests/commander-help.test.vitest.mjs.
  *
  * Same house style as those two files: exercise the composed slothlet api
  * against real temp git repos / XDG dirs (git.mjs, paths.mjs, report.mjs),
  * and a real commander Command tree through the directly-imported
- * custom-help.mjs factory (matching commander-help.test.mjs's pattern).
+ * custom-help.mjs factory (matching commander-help.test.vitest.mjs's pattern).
  * prompt.mjs is the one exception that needs the readline module mock above
  * to drive its interactive path deterministically.
  */
@@ -232,7 +232,7 @@ describe("api.report.detectionHeader — edge cases", () => {
 
 // ---------------------------------------------------------------------------
 // src/api/commander/custom-help.mjs — remaining branches
-// (direct-import style, matching tests/commander-help.test.mjs)
+// (direct-import style, matching tests/commander-help.test.vitest.mjs)
 // ---------------------------------------------------------------------------
 
 function buildCustomHelp() {

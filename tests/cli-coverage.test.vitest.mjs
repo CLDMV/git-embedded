@@ -1,11 +1,11 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/cli-coverage.test.mjs
+ *	@Filename: /tests/cli-coverage.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Gap-closing behavior tests for the CLI wrapper commands (src/api/cli/*.mjs),
  * driven through the composed slothlet api against REAL temp git repos in the
- * same house style as cli-hooks.test.mjs / cli-provisioning.test.mjs. Each test
+ * same house style as cli-hooks.test.vitest.mjs / cli-provisioning.test.vitest.mjs. Each test
  * targets an uncovered path the existing suites do not exercise:
  *
  *   - link:            full command coverage (blocksClone refusals, clone/add
@@ -119,7 +119,7 @@ function makeDispatcherDir(linked) {
 	return { dir, dispatch };
 }
 
-// ---- child-in-parent fixtures (mirrors cli-provisioning.test.mjs) --------
+// ---- child-in-parent fixtures (mirrors cli-provisioning.test.vitest.mjs) --------
 
 function makeChildBare(work, remotes, bareName, marker) {
 	const bare = path.join(remotes, `${bareName}.git`);

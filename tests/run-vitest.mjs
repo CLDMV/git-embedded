@@ -42,8 +42,8 @@ const code = await run({
 	cwd: root,
 	testDir: "tests",
 	vitestConfig: ".configs/vitest.config.mjs",
-	// git-embedded uses the plain `*.test.mjs` convention rather than `*.test.vitest.mjs`.
-	testFilePattern: /\.test\.mjs$/,
+	// CLDMV standing convention: vitest test files are always named `*.test.vitest.mjs`.
+	testFilePattern: /\.test\.vitest\.mjs$/,
 	testPatterns,
 	workers,
 	coverageQuiet,
