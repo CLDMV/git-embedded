@@ -1,10 +1,10 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/link-coverage.test.mjs
+ *	@Filename: /tests/link-coverage.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Coverage-completing behavior tests for the link + install-hooks layer,
- * complementing tests/install-link.test.mjs and tests/install-hooks.test.mjs.
+ * complementing tests/install-link.test.vitest.mjs and tests/install-hooks.test.vitest.mjs.
  * Everything here is driven through the composed slothlet api against REAL
  * files in temp dirs; the branches that only fire on Windows (privilege-denied
  * symlink → UAC batch) or on a copy/chmod failure are exercised by:

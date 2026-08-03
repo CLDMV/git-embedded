@@ -1,10 +1,10 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/detect-coverage.test.mjs
+ *	@Filename: /tests/detect-coverage.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Targeted coverage-closing tests for src/api/detect/*. tests/detect-hooks.test.mjs,
- * tests/detect-foreign.test.mjs, and tests/dispatcher-classify.test.mjs cover the
+ * Targeted coverage-closing tests for src/api/detect/*. tests/detect-hooks.test.vitest.mjs,
+ * tests/detect-foreign.test.vitest.mjs, and tests/dispatcher-classify.test.vitest.mjs cover the
  * baseline detection patterns; this file adds only the edge cases those don't
  * reach, closing dispatcher.mjs, husky.mjs, pre-commit.mjs, lefthook.mjs, and
  * run.mjs to 100% lines/statements/functions/branches:
