@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export default defineConfig({
 	root,
 	test: {
-		include: ["tests/**/*.test.mjs"],
+		include: ["tests/**/*.test.vitest.mjs"],
 		exclude: ["node_modules", "reference/**"],
 		environment: "node",
 		testTimeout: 30000,

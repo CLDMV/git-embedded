@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { getApi } from "./_setup.mjs";
 
 // These exercise the CLI command wrappers (src/api/cli/{restore,record,export,sync}.mjs)
-// against REAL temp git repos — the same fixture style as embedded-provisioning.test.mjs.
+// against REAL temp git repos — the same fixture style as embedded-provisioning.test.vitest.mjs.
 // Each wrapper reads process.cwd(), prints through self.report.* (console.log/error), and
 // restore/sync end with process.exit(code); we chdir into the fixture, capture the output,
 // and translate the process.exit into a return code.

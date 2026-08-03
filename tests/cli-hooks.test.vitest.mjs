@@ -1,6 +1,6 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/cli-hooks.test.mjs
+ *	@Filename: /tests/cli-hooks.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Behavior tests for the CLI wrapper commands that manage git hooks and print

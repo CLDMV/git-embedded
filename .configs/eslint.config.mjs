@@ -37,7 +37,7 @@ export default defineConfig([
 	{ files: ["**/*.js"], languageOptions: { sourceType: "commonjs" } },
 	{ files: ["**/*.{js,mjs,cjs}"], languageOptions: { globals: { ...globals.node } } },
 	{
-		files: ["tests/**/*.test.mjs"],
+		files: ["tests/**/*.test.vitest.mjs"],
 		languageOptions: {
 			globals: {
 				beforeAll: true,

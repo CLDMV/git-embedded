@@ -1,6 +1,6 @@
 /**
  * Coverage closure for the embedded engine. These target the error/edge/defensive
- * branches that embedded-provisioning.test.mjs and embedded-topup.test.mjs leave
+ * branches that embedded-provisioning.test.vitest.mjs and embedded-topup.test.vitest.mjs leave
  * uncovered, against REAL temp git fixtures (house style — no over-mocking):
  *
  *   - branch.mjs / gitlinks.mjs / registry.mjs — the `res.status ?? 1` spawn-failure

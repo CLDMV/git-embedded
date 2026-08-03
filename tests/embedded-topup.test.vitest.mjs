@@ -1,7 +1,7 @@
 /**
  * Branch top-up coverage for the embedded engine's smaller modules. These
  * exercise the error paths, ambiguous/edge inputs, and layer-precedence
- * branches that embedded-provisioning.test.mjs leaves uncovered:
+ * branches that embedded-provisioning.test.vitest.mjs leaves uncovered:
  *
  *   - branch.mjs   infer's "on no remote branch" (size 0) and git-error paths,
  *                  and attach's checkout-failure + best-effort-upstream branches.

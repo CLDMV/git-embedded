@@ -1,6 +1,6 @@
 /**
  *	@Project: @cldmv/git-embedded
- *	@Filename: /tests/hook-guards.test.mjs
+ *	@Filename: /tests/hook-guards.test.vitest.mjs
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  * Behavior tests for the two guard hooks, driven through REAL git operations
