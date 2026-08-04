@@ -1,6 +1,6 @@
 {
 	"name": "@cldmv/git-embedded",
-	"version": "1.1.4",
+	"version": "1.1.5",
 	"description": "Manage embedded git repositories (anonymous gitlinks) without .gitmodules. Provides hooks that restore standard git-command ergonomics for embedded children while keeping the child's origin URL out of the public parent repo.",
 	"type": "module",
 	"license": "Apache-2.0",
