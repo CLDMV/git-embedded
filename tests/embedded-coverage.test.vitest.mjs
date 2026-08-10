@@ -270,11 +270,7 @@ describe("manifest.build entry filtering", () => {
 	});
 
 	it("drops null and url-less entries, keeping only entries with a url", () => {
-		const manifest = api.embedded.manifest.build([
-			null,
-			{ path: "no-url" },
-			{ path: "keep", url: "ssh://h/keep.git", branch: "main" }
-		]);
+		const manifest = api.embedded.manifest.build([null, { path: "no-url" }, { path: "keep", url: "ssh://h/keep.git", branch: "main" }]);
 		expect(Object.keys(manifest.children)).toEqual(["keep"]);
 		expect(manifest.children.keep).toEqual({ url: "ssh://h/keep.git", branch: "main" });
 	});
@@ -468,7 +464,9 @@ describe("sync edge branches", () => {
 		// it a sync-failed anomaly.
 		fs.rmSync(path.join(fresh, "tests"), { recursive: true, force: true });
 		const { results, exitCode } = api.embedded.sync({ cwd: fresh, paths: ["tests"] });
-		expect(results).toEqual([{ path: "tests", sha: expect.any(String), branch: null, note: "not present on disk — run restore", outcome: "no-repo" }]);
+		expect(results).toEqual([
+			{ path: "tests", sha: expect.any(String), branch: null, note: "not present on disk — run restore", outcome: "no-repo" }
+		]);
 		expect(exitCode).toBe(0);
 	});
 
