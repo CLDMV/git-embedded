@@ -7,8 +7,8 @@ tmp/
 trash/
 reference/
 package-lock.json
-*.min.js
-*.min.css
+# minified / compact generated files of any extension (*.min.js/.css/.json/.map…)
+*.min.*
 
 # YAML — CI workflows are deliberately 4-space indented; prettier (tabWidth 2,
 # and YAML disallows tabs) would reindent every file 4->2 for no real gain.

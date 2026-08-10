@@ -19,8 +19,7 @@ export default defineConfig([
 			".vscode/**",
 			"coverage/**",
 			"reference/**",
-			"*.min.js",
-			"*.min.css",
+			"*.min.*",
 			"**/package-lock.json",
 			// Copy file patterns
 			"*copy/",
