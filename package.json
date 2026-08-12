@@ -83,7 +83,7 @@
 		"@cldmv/wisp": "^1.0.1",
 		"chalk": "^6.0.0",
 		"commander": "^15.0.0",
-		"marked": "^15.0.12",
+		"marked": "^18.0.9",
 		"marked-terminal": "^7.3.0"
 	},
 	"devDependencies": {
