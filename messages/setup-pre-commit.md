@@ -31,8 +31,9 @@ repos:
         entry: npx git-embedded run-hook reference-transaction
         language: system
         pass_filenames: false
-        stages: [reference-transaction]   # support for this stage depends on
-                                          # the pre-commit version
+        stages:
+          [reference-transaction] # support for this stage depends on
+          # the pre-commit version
         verbose: true
 ```
 

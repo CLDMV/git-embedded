@@ -21,7 +21,8 @@ export const spec = {
 };
 
 const LABEL = {
-	restored: (r) => `${r.dryRun ? "would restore" : "restored"} ${r.path} from ${r.source} (${r.url})${r.branch ? ` on branch ${r.branch}` : ""}`,
+	restored: (r) =>
+		`${r.dryRun ? "would restore" : "restored"} ${r.path} from ${r.source} (${r.url})${r.branch ? ` on branch ${r.branch}` : ""}`,
 	"already-present": (r) => `${r.path} already present`,
 	skipped: (r) => `${r.path} skipped`,
 	unresolved: (r) => `${r.path} unresolved${r.note ? ` — ${r.note}` : ""}`,

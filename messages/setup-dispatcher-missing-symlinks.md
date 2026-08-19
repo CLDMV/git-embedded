@@ -28,6 +28,7 @@ The CLI will then install `git-embedded`'s hook scripts into this repo's `.git/h
 If you decline the heal, the CLI exits without changes. You can heal manually:
 
 **Linux / macOS (symlinks, no elevation needed):**
+
 ```bash
 ln -sf _dispatch <dispatcher-dir>/post-checkout
 ln -sf _dispatch <dispatcher-dir>/post-merge
@@ -36,6 +37,7 @@ ln -sf _dispatch <dispatcher-dir>/reference-transaction
 ```
 
 **Windows (symlinks, run from an elevated Command Prompt):**
+
 ```cmd
 mklink "<dispatcher-dir>\post-checkout" "<dispatcher-dir>\_dispatch"
 mklink "<dispatcher-dir>\post-merge" "<dispatcher-dir>\_dispatch"
@@ -44,6 +46,7 @@ mklink "<dispatcher-dir>\reference-transaction" "<dispatcher-dir>\_dispatch"
 ```
 
 **Windows (hard links, no elevation needed — alternative if you don't want to elevate):**
+
 ```cmd
 mklink /H "<dispatcher-dir>\post-checkout" "<dispatcher-dir>\_dispatch"
 mklink /H "<dispatcher-dir>\post-merge" "<dispatcher-dir>\_dispatch"
