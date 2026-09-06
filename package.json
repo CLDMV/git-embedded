@@ -79,7 +79,7 @@
 		"build": "echo 'no build step - stopgap for CI coverage-badge; see tracking issue'"
 	},
 	"dependencies": {
-		"@cldmv/slothlet": "^3.7.0",
+		"@cldmv/slothlet": "^3.15.2",
 		"@cldmv/wisp": "^1.0.1",
 		"chalk": "^6.0.0",
 		"commander": "^15.0.0",
