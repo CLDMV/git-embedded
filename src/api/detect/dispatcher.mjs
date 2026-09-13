@@ -22,11 +22,7 @@ export const STANDARD_HOOK_NAMES = [
 
 const DISPATCHER_MARKER = "# git-embedded-compatible dispatcher";
 
-const CHAIN_PATTERNS = [
-	/exec\s+"?\$repo_hook"?/,
-	/exec\s+"?\$\{?repo_hook\}?"?/,
-	/exec\s+"?\$git_dir\/hooks\/\$hook"?/
-];
+const CHAIN_PATTERNS = [/exec\s+"?\$repo_hook"?/, /exec\s+"?\$\{?repo_hook\}?"?/, /exec\s+"?\$git_dir\/hooks\/\$hook"?/];
 
 function readFull(p) {
 	try {
