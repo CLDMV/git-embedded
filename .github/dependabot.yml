@@ -67,6 +67,17 @@ updates:
       open-pull-requests-limit: 5
       commit-message:
           prefix: "deps"
+      # marked-terminal@7.3.0 (its latest published release) peers marked at
+      # ">=1 <16", so any marked bump to 16+ fails `npm ci` with an ERESOLVE
+      # (git-embedded uses both: bin/git-embedded.mjs renders help/docs to the
+      # terminal via marked + marked-terminal). There's no newer marked-terminal
+      # release that lifts the cap, so this isn't a "bump the lagging package"
+      # fix like the vitest split below — it's a genuine upstream constraint.
+      # Ignore marked majors past what marked-terminal supports until it (or a
+      # replacement) adds marked 16+ support; drop this once it does.
+      ignore:
+          - dependency-name: "marked"
+            versions: [">=16"]
       groups:
           # vitest and @vitest/coverage-v8 (and other @vitest/* packages) peer
           # each other exactly, so bumping one without the other breaks
