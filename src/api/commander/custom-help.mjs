@@ -164,14 +164,12 @@ export function makeCustomHelp(HelpClass, deps) {
 			const cmdColor = indent === 1 ? chalk.cyan : chalk.blueBright;
 			output.push(`${pad}${color(cmdColor, term)}`);
 			if (aliases.length) {
-				wrapTextWithHangingIndent(aliases.join(", "), indent + 1, "Aliases", (s) => color(chalk.yellow.italic, s)).forEach(
-					(l) => output.push(l)
+				wrapTextWithHangingIndent(aliases.join(", "), indent + 1, "Aliases", (s) => color(chalk.yellow.italic, s)).forEach((l) =>
+					output.push(l)
 				);
 			}
 			if (desc) {
-				wrapTextWithHangingIndent(desc, indent + 1, "Description", (s) => color(chalk.gray.italic, s)).forEach((l) =>
-					output.push(l)
-				);
+				wrapTextWithHangingIndent(desc, indent + 1, "Description", (s) => color(chalk.gray.italic, s)).forEach((l) => output.push(l));
 			}
 			output.push("");
 

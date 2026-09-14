@@ -14,12 +14,12 @@ Edit `package.json` to add `git-embedded`'s invocations to the `simple-git-hooks
 
 ```json
 {
-  "simple-git-hooks": {
-    "post-checkout": "npx git-embedded run-hook post-checkout \"$@\"",
-    "post-merge":    "npx git-embedded run-hook post-merge \"$@\"",
-    "post-rewrite":  "npx git-embedded run-hook post-rewrite \"$@\"",
-    "reference-transaction": "npx git-embedded run-hook reference-transaction \"$@\""
-  }
+	"simple-git-hooks": {
+		"post-checkout": "npx git-embedded run-hook post-checkout \"$@\"",
+		"post-merge": "npx git-embedded run-hook post-merge \"$@\"",
+		"post-rewrite": "npx git-embedded run-hook post-rewrite \"$@\"",
+		"reference-transaction": "npx git-embedded run-hook reference-transaction \"$@\""
+	}
 }
 ```
 

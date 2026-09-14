@@ -9,11 +9,7 @@ export const spec = {
 		["--yes", "Skip confirmation prompts; assume yes for any modification."],
 		["--dispatcher-dir <path>", "Override the default dispatcher directory (~/.config/git/hooks)."]
 	],
-	examples: [
-		"$ git-embedded install-hooks",
-		"$ git-embedded install-hooks --no-symlinks",
-		"$ git-embedded install-hooks --yes"
-	]
+	examples: ["$ git-embedded install-hooks", "$ git-embedded install-hooks --no-symlinks", "$ git-embedded install-hooks --yes"]
 };
 
 export async function run(opts = {}) {
@@ -72,7 +68,8 @@ async function healAndInstall(result, opts) {
 			{ noSymlinks: opts.noSymlinks }
 		);
 		self.report.success(`Healed ${linkResult.created.length} entries`);
-		if (linkResult.fallbackToCopy.length > 0) self.report.warn(`Filesystem fallback to copy for ${linkResult.fallbackToCopy.length} entries`);
+		if (linkResult.fallbackToCopy.length > 0)
+			self.report.warn(`Filesystem fallback to copy for ${linkResult.fallbackToCopy.length} entries`);
 	} catch (err) {
 		if (err instanceof CancelledByUser) {
 			self.report.error(err.message);

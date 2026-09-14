@@ -10,7 +10,7 @@ The classical clean-room reimplementation defense — used most famously by Phoe
 
 The defense is strong when the dirty team is genuinely good at abstraction. It is weak when the "spec" they hand off is mostly the original code transliterated into prose — that intermediate spec is itself a derivative work, and so is the downstream output. Humans trained as engineers tend to be careful at this; large language models tend not to be, paraphrasing more than abstracting.
 
-Comprehensive tests bypass the dirty team entirely. They are already a behavioral specification — that's their entire purpose — and they were written to be implementation-independent. A test file is *not* a derivative work of the implementation in any meaningful sense; courts have held repeatedly that purely functional descriptions, API surfaces, and behavioral specifications are not protectable expression (Google v. Oracle 2021, Computer Associates v. Altai 1992, Sega v. Accolade 1992). The output produced by an AI given test files as input is not, on its face, substantially similar to the original code — especially if the reimplementation is in a different programming language.
+Comprehensive tests bypass the dirty team entirely. They are already a behavioral specification — that's their entire purpose — and they were written to be implementation-independent. A test file is _not_ a derivative work of the implementation in any meaningful sense; courts have held repeatedly that purely functional descriptions, API surfaces, and behavioral specifications are not protectable expression (Google v. Oracle 2021, Computer Associates v. Altai 1992, Sega v. Accolade 1992). The output produced by an AI given test files as input is not, on its face, substantially similar to the original code — especially if the reimplementation is in a different programming language.
 
 The threat is therefore:
 
@@ -45,7 +45,7 @@ Several alternatives were considered for tracking the pinned tests version:
 - **A submodule with a fake URL** in `.gitmodules`, overridden locally via `.git/config`. Git automation works because the registry entry exists; the URL leak is reduced because the public URL is a non-resolving decoy. But the decoy itself advertises "we are deliberately hiding the real URL," which signals more intent than no entry at all.
 - **An anonymous gitlink** (gitlink in the tree with no `.gitmodules` entry). Most opaque — the public parent shows the gitlink and SHA but no URL, which could plausibly be a leftover, mistake, or any other innocuous explanation. Loses git's automation, which is the gap this package fills with its hooks.
 
-The choice is partly aesthetic but mostly about how the parent repo presents itself to outside observers. The anonymous gitlink presents minimum signal: an embedded reference whose target is not declared, the way most other features in a repo work (you can see *that* something exists without being told everything about *what* it is).
+The choice is partly aesthetic but mostly about how the parent repo presents itself to outside observers. The anonymous gitlink presents minimum signal: an embedded reference whose target is not declared, the way most other features in a repo work (you can see _that_ something exists without being told everything about _what_ it is).
 
 ## Licensing strategy
 
