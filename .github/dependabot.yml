@@ -32,48 +32,84 @@
 
 version: 2
 updates:
-  # GitHub Actions: keep pinned action SHAs / version tags fresh.
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    target-branch: "next"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
-    # Grouped PRs cut noise: one PR per (security | patch | minor) bundle
-    # per week instead of N separate PRs. Security PRs still get retargeted
-    # to `hotfixes` by hotfix-redirector.yml when GHSA refs appear in the
-    # body — bundling N GHSA fixes into one PR is fine, the redirector
-    # only needs one match to retarget.
-    groups:
-      security:
-        applies-to: security-updates
-        patterns: ["*"]
-      patch:
-        applies-to: version-updates
-        update-types: ["patch"]
-      minor:
-        applies-to: version-updates
-        update-types: ["minor"]
+    # GitHub Actions: keep pinned action SHAs / version tags fresh.
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      target-branch: "next"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 5
+      commit-message:
+          prefix: "deps"
+      # Grouped PRs cut noise: one PR per (security | patch | minor) bundle
+      # per week instead of N separate PRs. Security PRs still get retargeted
+      # to `hotfixes` by hotfix-redirector.yml when GHSA refs appear in the
+      # body — bundling N GHSA fixes into one PR is fine, the redirector
+      # only needs one match to retarget.
+      groups:
+          security:
+              applies-to: security-updates
+              patterns: ["*"]
+          patch:
+              applies-to: version-updates
+              update-types: ["patch"]
+          minor:
+              applies-to: version-updates
+              update-types: ["minor"]
 
-  # NPM: package.json + package-lock.json updates.
-  # Delete this block if your repo isn't a Node project.
-  - package-ecosystem: "npm"
-    directory: "/"
-    target-branch: "next"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps"
-    groups:
-      security:
-        applies-to: security-updates
-        patterns: ["*"]
-      patch:
-        applies-to: version-updates
-        update-types: ["patch"]
-      minor:
-        applies-to: version-updates
-        update-types: ["minor"]
+    # NPM: package.json + package-lock.json updates.
+    # Delete this block if your repo isn't a Node project.
+    - package-ecosystem: "npm"
+      directory: "/"
+      target-branch: "next"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 5
+      commit-message:
+          prefix: "deps"
+      # marked-terminal@7.3.0 (its latest published release) peers marked at
+      # ">=1 <16", so any marked bump to 16+ fails `npm ci` with an ERESOLVE
+      # (git-embedded uses both: bin/git-embedded.mjs renders help/docs to the
+      # terminal via marked + marked-terminal). There's no newer marked-terminal
+      # release that lifts the cap, so this isn't a "bump the lagging package"
+      # fix like the vitest split below — it's a genuine upstream constraint.
+      # Ignore marked majors past what marked-terminal supports until it (or a
+      # replacement) adds marked 16+ support; drop this once it does.
+      ignore:
+          - dependency-name: "marked"
+            versions: [">=16"]
+      groups:
+          # vitest and @vitest/coverage-v8 (and other @vitest/* packages) peer
+          # each other exactly, so bumping one without the other breaks
+          # `npm ci` with an ERESOLVE. Bump the whole family together in one
+          # PR. Must come before security/patch/minor below — Dependabot
+          # assigns each update to the FIRST matching group.
+          vitest:
+              patterns:
+                  - "vitest"
+                  - "@vitest/*"
+          # @eslint/js peers eslint with a major-locked range ("^10.0.0"), so a
+          # future eslint major bump without @eslint/js moving too would hit
+          # the same npm ci ERESOLVE class as the vitest/coverage-v8 split.
+          # @cldmv/eslint-plugin-jsonv doesn't peer eslint directly but is
+          # bundled here to keep the lint-config family moving together.
+          eslint:
+              patterns:
+                  - "eslint"
+                  - "@eslint/*"
+                  - "@cldmv/eslint-plugin-*"
+          # @cldmv/prettier-plugin-jsonv peers prettier with a major-locked
+          # range ("^3.0.0") — same reasoning as the eslint group above.
+          prettier:
+              patterns:
+                  - "prettier"
+                  - "@cldmv/prettier-plugin-*"
+          security:
+              applies-to: security-updates
+              patterns: ["*"]
+          patch:
+              applies-to: version-updates
+              update-types: ["patch"]
+          minor:
+              applies-to: version-updates
+              update-types: ["minor"]
