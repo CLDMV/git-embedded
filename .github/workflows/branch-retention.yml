@@ -21,18 +21,20 @@
 name: 🌿 Branch Retention
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [master, main, next, hotfixes]
+    pull_request:
+        types: [closed]
+        branches: [master, main, next, hotfixes]
 
 permissions:
-  contents: write
-  pull-requests: read
+    contents: read
 
 jobs:
-  retain:
-    if: github.event.pull_request.merged == true
-    uses: CLDMV/.github/.github/workflows/reusable-branch-retention.yml@v4
-    secrets:
-      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+    retain:
+        permissions:
+            contents: write
+            pull-requests: read
+        if: github.event.pull_request.merged == true
+        uses: CLDMV/.github/.github/workflows/reusable-branch-retention.yml@v4
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
