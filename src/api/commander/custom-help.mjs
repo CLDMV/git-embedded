@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/git-embedded
+ *	@Filename: /src/api/commander/custom-help.mjs
+ *	@Date: 2026-05-24T21:13:00-07:00 (1779682380)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:16-07:00 (1790968816)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * Build a `Help` subclass that renders colorized, multi-line help with the
  * look the rest of the CLDMV CLIs use. The bin entry passes commander's
  * statically imported `Help` class in once.

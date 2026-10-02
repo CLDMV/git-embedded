@@ -1,25 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/install-link.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:29-07:00 (1790968829)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Behavior tests for the install-dispatch + link-batch layer, driven through
- * the composed slothlet api against REAL files in temp dirs:
- *
- * - api.install.dispatcher (bootstrap|heal): writes hooks/_dispatch from the
- *   packaged template and fans out links to the standard hook names; heal only
- *   adds the missing ones without rewriting the dispatcher; unknown op throws.
- * - api.install.template: seeds a `git init` templateDir/hooks with the package
- *   hooks, honoring the foreign-hook skip and the --force override.
- * - api.link.batch: symlink (default) / hardlink (noSymlinks) mechanisms, the
- *   overwrite pre-removal, the copy fallback when a symlink can't be made, and
- *   the throw paths when no mechanism succeeds.
- * - api.link.copyExecutable: copy + +x bit, the overwrite pre-removal branch,
- *   and the overwrite:false branch.
- *
- * The Windows deferred-symlink → UAC-elevation path in link/batch.mjs is
- * guarded by `process.platform === "win32"` and is not reachable on POSIX CI;
- * it is not exercised here (see notes).
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";

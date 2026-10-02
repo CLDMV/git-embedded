@@ -1,27 +1,16 @@
 /**
- *	@Project: @cldmv/slothlet
+ *
+ *	@Project: @cldmv/git-embedded
  *	@Filename: /.configs/tsconfig.dts.jsonc
  *	@Date: 2025-09-09T08:06:19-07:00 (1757430379)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-04-28 00:45:54 -07:00 (1777362354)
+ *	@Last modified time: 2026-10-02T12:20:07-07:00 (1790968807)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
- */
-
-/*
- * @Project: @cldmv/slothlet
- * @Filename: /.configs/tsconfig.dts.jsonc
- * @Date: 2025-09-09T08:06:19-07:00 (1757430379)
- * @Author: Nate Corcoran <CLDMV>
- * @Email: <Shinrai@users.noreply.github.com>
- * -----
- * @Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- * @Last modified time: 2026-04-28 00:44:01 -07:00 (1777362241)
- * -----
- * @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
  */
 
 {

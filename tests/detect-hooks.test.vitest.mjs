@@ -1,26 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/detect-hooks.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:26-07:00 (1790968826)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Coverage tests for the hook-manager detectors and the detect orchestrator:
- *
- * - src/api/detect/lefthook.mjs        — config-name variants, the gitDir
- *   hooks-header scan (headerIn), and the null/no-match branches.
- * - src/api/detect/pre-commit.mjs      — the gitDir hooks-header scan and the
- *   null/no-match branches.
- * - src/api/detect/simple-git-hooks.mjs — the package.json key path (with its
- *   parsed config), the standalone `.simple-git-hooks.json` path, and the
- *   wispSync-throws → pkg=null branch.
- * - src/api/detect/run.mjs             — the whole classifier: foreign-manager
- *   precedence (husky > lefthook > simple-git-hooks > pre-commit), effective
- *   core.hooksPath sub-classification (canonical / missing / non-conforming /
- *   bare / empty), system-scope hooksPath, init.templateDir fallback, and none.
- *
- * The detectors are pure-fs and are driven directly with fabricated
- * repoRoot/gitDir args (matching tests/detect-foreign.test.vitest.mjs). run() shells
- * out to real git, so it is driven against real temp repos with a hermetic git
- * environment (matching tests/embedded-provisioning.test.vitest.mjs).
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
