@@ -1,37 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/detect-coverage.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:26-07:00 (1790968826)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Targeted coverage-closing tests for src/api/detect/*. tests/detect-hooks.test.vitest.mjs,
- * tests/detect-foreign.test.vitest.mjs, and tests/dispatcher-classify.test.vitest.mjs cover the
- * baseline detection patterns; this file adds only the edge cases those don't
- * reach, closing dispatcher.mjs, husky.mjs, pre-commit.mjs, lefthook.mjs, and
- * run.mjs to 100% lines/statements/functions/branches:
- *
- * - src/api/detect/dispatcher.mjs — falsy `dir`, an unreadable dir, a
- *   directory-shaped `_dispatch` (readFileSync EISDIR), relative symlink
- *   targets, the copy-cluster hashing loop's skip/unreadable/losing-bucket
- *   branches, the all-different-content (no cluster) case, a dotted
- *   non-hook-only dir, a symlink pointing at an unrelated decoy file, and the
- *   TOCTOU-style fs-race branches (lstatSync/readlinkSync/statSync/
- *   realpathSync throwing after an earlier check already confirmed the path)
- *   simulated via targeted fs spies since a real filesystem race can't be
- *   fabricated deterministically.
- * - src/api/detect/husky.mjs — falsy repoRoot, a malformed package.json
- *   (wispSync throws), and the dependencies-only husky fallback.
- * - src/api/detect/pre-commit.mjs — falsy gitDir, a gitDir with no hooks
- *   subdir, and the readHead catch (a subdirectory entry in hooks/).
- * - src/api/detect/lefthook.mjs — the readHead catch (a subdirectory entry
- *   in hooks/).
- * - src/api/detect/run.mjs — the `effectiveHooksPath || systemPath`
- *   fallback, triggered by a cwd that doesn't exist on disk (so
- *   getEffectiveHooksPath's git spawn fails) while the system hooksPath
- *   scope is still readable (getAllHooksPathScopes ignores its cwd
- *   argument and reads from the real process cwd).
- *
- * Scratch fixtures live under this repo's tmp/ (never the system /tmp), are
- * tracked per-test, and are removed in afterEach/afterAll.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

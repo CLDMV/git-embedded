@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/git-embedded
+ *	@Filename: /tests/embedded-coverage.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:27-07:00 (1790968827)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * Coverage closure for the embedded engine. These target the error/edge/defensive
  * branches that embedded-provisioning.test.vitest.mjs and embedded-topup.test.vitest.mjs leave
  * uncovered, against REAL temp git fixtures (house style — no over-mocking):

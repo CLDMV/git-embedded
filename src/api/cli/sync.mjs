@@ -1,3 +1,18 @@
+/**
+ *
+ *	@Project: @cldmv/git-embedded
+ *	@Filename: /src/api/cli/sync.mjs
+ *	@Date: 2026-07-18T23:04:02-07:00 (1784441042)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:15-07:00 (1790968815)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
 import { self } from "@cldmv/slothlet/runtime";
 
 export const spec = {

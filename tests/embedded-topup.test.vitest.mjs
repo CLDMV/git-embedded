@@ -1,4 +1,19 @@
 /**
+ *
+ *	@Project: @cldmv/git-embedded
+ *	@Filename: /tests/embedded-topup.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:27-07:00 (1790968827)
+ *	-----
+ *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+ *
+ */
+
+/**
  * Branch top-up coverage for the embedded engine's smaller modules. These
  * exercise the error paths, ambiguous/edge inputs, and layer-precedence
  * branches that embedded-provisioning.test.vitest.mjs leaves uncovered:
