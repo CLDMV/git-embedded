@@ -1,27 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/link-coverage.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:30-07:00 (1790968830)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Coverage-completing behavior tests for the link + install-hooks layer,
- * complementing tests/install-link.test.vitest.mjs and tests/install-hooks.test.vitest.mjs.
- * Everything here is driven through the composed slothlet api against REAL
- * files in temp dirs; the branches that only fire on Windows (privilege-denied
- * symlink → UAC batch) or on a copy/chmod failure are exercised by:
- *
- * - Pinning `process.platform` to "win32" for the duration of a single
- *   synchronous `api.link.batch` call, then restoring it.
- * - Injecting controlled failures into the fs primitives the leaf calls
- *   (`symlinkSync`, `linkSync`, `chmodSync`) — the leaf reads them off the
- *   shared node:fs object at call time, so a temporary property swap makes the
- *   documented fallback/branch fire without needing a real cross-volume mount
- *   or a real UAC prompt.
- * - Overriding `api.link.elevateWindows` (the Windows-only helper is excluded
- *   from coverage and cannot run on POSIX) with a stub that returns each of the
- *   result shapes the batch caller must handle: cancelled, failed, succeeded.
- *
- * All stubs are restored in a finally before any assertion runs, so a failed
- * expectation can never leave process.platform or fs mutated for later tests.
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";

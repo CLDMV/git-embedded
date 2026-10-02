@@ -1,28 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/cli-coverage.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:25-07:00 (1790968825)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Gap-closing behavior tests for the CLI wrapper commands (src/api/cli/*.mjs),
- * driven through the composed slothlet api against REAL temp git repos in the
- * same house style as cli-hooks.test.vitest.mjs / cli-provisioning.test.vitest.mjs. Each test
- * targets an uncovered path the existing suites do not exercise:
- *
- *   - link:            full command coverage (blocksClone refusals, clone/add
- *                      failures, outside-worktree guards, the non-repo add path).
- *   - install-hooks:   the switch default, the no-gitDir + all-skipped install
- *                      paths, heal/bootstrap copy-fallback, the git-config
- *                      failure, the CancelledByUser + re-throw catch arms, and
- *                      the "no git repo" post-bootstrap branch.
- *   - init:            the git-config failure warn arm.
- *   - export:          the missing-exclude catch, the no-trailing-newline prefix,
- *                      and the non-repo root fallback.
- *   - install-template: the nothing-installed (all-skipped) branch.
- *   - record/restore/sync: the no-branch / no-note LABEL arms and the
- *                      unknown-outcome LABEL fallbacks.
- *
- * Temp git repos live under the repo's own tmp/ (never the system /tmp), and a
- * GIT_CEILING so a non-repo temp dir there is genuinely seen as a non-repo.
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

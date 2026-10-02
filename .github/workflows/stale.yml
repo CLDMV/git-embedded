@@ -1,10 +1,14 @@
 #
-# @Project: @cldmv/git-embedded
-# @Filename: /.github/workflows/stale.yml
-# @Date: 2026-05-20 00:00:00 -07:00 (1779606000)
-# @Author: Nate Corcoran <CLDMV>
-# @Email: <Shinrai@users.noreply.github.com>
-# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#	@Project: @cldmv/git-embedded
+#	@Filename: /.github/workflows/stale.yml
+#	@Date: 2026-05-20T00:00:00-07:00 (1779260400)
+#	@Author: Nate Corcoran <CLDMV>
+#	@Email: <Shinrai@users.noreply.github.com>
+#	-----
+#	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+#	@Last modified time: 2026-10-02T12:20:12-07:00 (1790968812)
+#	-----
+#	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
 # Individual repo: .github/workflows/stale.yml
@@ -18,29 +22,29 @@
 name: 🍂 Stale Issues & PRs
 
 on:
-  schedule:
-    - cron: "13 5 * * *" # daily 05:13 UTC (off-the-hour to avoid GH cron stampede)
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Preview only — no changes will be made"
-        type: boolean
-        default: false
+    schedule:
+        - cron: "13 5 * * *" # daily 05:13 UTC (off-the-hour to avoid GH cron stampede)
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Preview only — no changes will be made"
+                type: boolean
+                default: false
 
 permissions:
-  issues: write
-  pull-requests: write
+    issues: write
+    pull-requests: write
 
 jobs:
-  sweep:
-    uses: CLDMV/.github/.github/workflows/reusable-stale.yml@v4
-    with:
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-      # Override timers if needed:
-      # days_before_issue_stale: 60
-      # days_before_issue_close: 14
-      # days_before_pr_stale: 30
-      # days_before_pr_close: 7
-    secrets:
-      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+    sweep:
+        uses: CLDMV/.github/.github/workflows/reusable-stale.yml@v4
+        with:
+            dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+            # Override timers if needed:
+            # days_before_issue_stale: 60
+            # days_before_issue_close: 14
+            # days_before_pr_stale: 30
+            # days_before_pr_close: 7
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}

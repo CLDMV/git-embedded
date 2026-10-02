@@ -1,21 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/cli-hooks.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:25-07:00 (1790968825)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Behavior tests for the CLI wrapper commands that manage git hooks and print
- * misc info, driven through the composed slothlet api against REAL temp git
- * repos (per the house style). Covers:
- *
- * - install-hooks: the detection-driven switch (refuse / suggest-dispatcher /
- *   heal-then-install / install), the per-repo install (owned-copy + foreign
- *   skip), the dispatcher bootstrap (+ global core.hooksPath), and the heal.
- * - uninstall-hooks: removes only git-embedded-owned hooks, keeps foreign ones,
- *   reports "none found", and refuses outside a repo.
- * - install-template: templateDir resolution, confirm gate, --force overwrite.
- * - print-hook-script: known-name passthrough to stdout + unknown-name refusal.
- * - version / doctor / init: the small wrappers around package.json, detection,
- *   and the install-hooks + advice-silencing composition.
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

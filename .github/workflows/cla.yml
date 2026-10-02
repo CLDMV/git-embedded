@@ -1,10 +1,14 @@
 #
-# @Project: @cldmv/git-embedded
-# @Filename: /.github/workflows/cla.yml
-# @Date: 2026-07-19 00:00:00 -07:00 (1784523600)
-# @Author: Nate Corcoran <CLDMV>
-# @Email: <Shinrai@users.noreply.github.com>
-# @Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
+#	@Project: @cldmv/git-embedded
+#	@Filename: /.github/workflows/cla.yml
+#	@Date: 2026-07-19T00:00:00-07:00 (1784444400)
+#	@Author: Nate Corcoran <CLDMV>
+#	@Email: <Shinrai@users.noreply.github.com>
+#	-----
+#	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+#	@Last modified time: 2026-10-02T12:20:08-07:00 (1790968808)
+#	-----
+#	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
 #
 
 # Individual repo: .github/workflows/cla.yml
@@ -35,26 +39,28 @@
 name: 📜 CLA
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-  issue_comment:
-    types: [created]
+    pull_request_target:
+        types: [opened, synchronize, reopened, ready_for_review]
+    issue_comment:
+        types: [created]
 
 permissions:
-  contents: read
-  pull-requests: write
-  statuses: write
-  issues: write
+    contents: read
 
 jobs:
-  cla:
-    uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v4
-    with:
-      cla_version: "1.0"
-    secrets:
-      BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
-      CLA_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_CLA_BOT_APP_CLIENT_ID }}
-      CLA_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_CLA_BOT_APP_PRIVATE_KEY }}
-      TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
-      TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}
+    cla:
+        permissions:
+            contents: read
+            pull-requests: write
+            statuses: write
+            issues: write
+        uses: CLDMV/.github/.github/workflows/reusable-cla.yml@v4
+        with:
+            cla_version: "1.0"
+        secrets:
+            BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_BOT_APP_CLIENT_ID }}
+            BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_BOT_APP_PRIVATE_KEY }}
+            CLA_BOT_APP_CLIENT_ID: ${{ secrets.CLDMV_CLA_BOT_APP_CLIENT_ID }}
+            CLA_BOT_APP_PRIVATE_KEY: ${{ secrets.CLDMV_CLA_BOT_APP_PRIVATE_KEY }}
+            TAGGER_NAME: ${{ secrets.CLDMV_BOT_NAME }}
+            TAGGER_EMAIL: ${{ secrets.CLDMV_BOT_EMAIL }}

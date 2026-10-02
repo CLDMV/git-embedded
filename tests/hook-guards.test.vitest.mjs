@@ -1,23 +1,16 @@
 /**
+ *
  *	@Project: @cldmv/git-embedded
  *	@Filename: /tests/hook-guards.test.vitest.mjs
+ *	@Date: 2026-08-02T23:38:12-07:00 (1785739092)
+ *	@Author: Nate Corcoran <CLDMV>
+ *	@Email: <Shinrai@users.noreply.github.com>
+ *	-----
+ *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
+ *	@Last modified time: 2026-10-02T12:20:28-07:00 (1790968828)
+ *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
- * Behavior tests for the two guard hooks, driven through REAL git operations
- * with the hooks installed into the parent's .git/hooks:
- *
- * - reference-transaction (embedded.guard = precise | strict | off): which
- *   HEAD moves are allowed/blocked given each child's dirty state and the
- *   pins in the NEW commit. Covers the plumbing fact that a plain commit
- *   emits a HEAD transaction line, the precise rule (dirty + would-re-pin),
- *   strict's all-clean + pins-current-on-append policy, and the drifted-child
- *   hole a naive pin-delta rule would miss.
- *
- * - pre-push (embedded.pushRecurse = check | on-demand | off): parent pushes
- *   are rejected while a newly-pinned child commit is unreachable from the
- *   child's origin, allowed once the child is pushed (on-demand publishes the
- *   child's branch to do that automatically), and unrelated (pin-less) pushes
- *   from a children-less clone stay allowed.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
