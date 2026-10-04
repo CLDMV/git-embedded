@@ -6,6 +6,23 @@
 
 Manage embedded git repositories (anonymous gitlinks) without `.gitmodules`. Provides hooks that restore standard git-command ergonomics for embedded child repos while keeping the child's origin URL out of the public parent repo.
 
+## ✨ What's New
+
+### Latest: v1.1.12 (October 2026)
+
+- **Header tooling on fix-headers 2.1.4** — the `@cldmv/fix-headers` dev dependency moves to 2.1.4 and the header pass was re-run; every file already matched, so nothing was restamped. No CLI code, hook, published file or runtime dependency changed (#91).
+- **Complete version history** — every release from v1.0.0 onward now has a changelog under [docs/changelog/](https://github.com/CLDMV/git-embedded/tree/master/docs/changelog/). Note that v1.1.3 raised `engines.node` to `>=22.12.0` despite being a patch release, and that v1.1.0 (first published as part of v1.1.1) added the `pre-push` check and changed the default `reference-transaction` guard.
+- [View full v1.1.12 Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.12.md)
+
+### Recent Releases
+
+- **v1.1.11** (October 2026) — the CI `✅ Required PR Check` mirror job runs on every path instead of being skipped on in-repo PRs, plus lockfile updates (#85, #86, #88) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.11.md))
+- **v1.1.10** (October 2026) — uniform file headers from the shared CLDMV config, the verbatim Apache-2.0 license text, a v4.29.2 workflow sync and a batch of dependency updates (#76, #79, #80, #82, #83, #84) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.10.md))
+- **v1.1.9** (September 2026) — the canonical CLDMV ESLint/Prettier config with `.jsonv` support, the vitest 5 Node range in CI, and signed redirected security PRs (#48) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.9.md))
+- **v1.1.8** (September 2026) — `vitest` and `@vitest/coverage-v8` move to 5.x together (#70) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.8.md))
+
+📚 **For complete version history, see [docs/changelog/](https://github.com/CLDMV/git-embedded/tree/master/docs/changelog/) and the [GitHub Releases](https://github.com/CLDMV/git-embedded/releases).**
+
 ## What this is
 
 Git uses **gitlinks** internally to track sub-repositories: a tree entry of mode `160000` pointing at a specific commit SHA in another repository. Submodules are built on top of gitlinks, with a registry file (`.gitmodules`) that records the child's URL alongside the gitlink. The URL is what makes `git clone --recurse-submodules`, `git submodule update`, and `submodule.recurse=true` checkout-flavored automation work — but it's also what publicly advertises the child repo's existence and location.
