@@ -10,7 +10,7 @@ Manage embedded git repositories (anonymous gitlinks) without `.gitmodules`. Pro
 
 ### Latest: v1.1.12 (October 2026)
 
-- **Header tooling on fix-headers 2.1.4** — the `@cldmv/fix-headers` dev dependency moves to 2.1.4 and the header pass was re-run; every file already matched, so nothing was restamped. No CLI code, hook, published file or runtime dependency changed (#91).
+- **Header tooling on fix-headers 2.2.0** — the `@cldmv/fix-headers` dev dependency moves to 2.2.0 (`@Last modified by` now follows content edits only) with `@cldmv/configs` 1.2.4, and a dev-only `brace-expansion` patch update lands in the lockfile; nothing needed restamping. No CLI code, hook, published file or runtime dependency changed (#90, #91, #94).
 - **Complete version history** — every release from v1.0.0 onward now has a changelog under [docs/changelog/](https://github.com/CLDMV/git-embedded/tree/master/docs/changelog/). Note that v1.1.3 raised `engines.node` to `>=22.12.0` despite being a patch release, and that v1.1.0 (first published as part of v1.1.1) added the `pre-push` check and changed the default `reference-transaction` guard.
 - [View full v1.1.12 Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.12.md)
 
