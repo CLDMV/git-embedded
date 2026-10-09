@@ -180,7 +180,8 @@ afterEach(() => {
 	} catch {
 		// ignore
 	}
-	process.env = originalEnv;
+	for (const k of Object.keys(process.env)) delete process.env[k];
+	Object.assign(process.env, originalEnv); // restore in place: reassigning process.env breaks child-process env inheritance on Node >=26.11
 	vi.restoreAllMocks();
 	while (tmpRoots.length) {
 		const d = tmpRoots.pop();
