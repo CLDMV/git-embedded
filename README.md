@@ -221,7 +221,7 @@ git config core.hooksPath .githooks
 ## Compatibility
 
 - **Git 2.28 or newer** for the `reference-transaction` hook (released July 2020). The `update-embedded-repos` hook works on older git but loses its guard.
-- **Node 20.19+** for the CLI. The hooks themselves are shell scripts with no Node dependency at hook execution time.
+- **Node 22.15+** for the CLI. The hooks themselves are shell scripts with no Node dependency at hook execution time.
 - **Linux / macOS / Windows.** On Windows, symlink creation needs admin elevation (a one-shot UAC prompt the CLI requests). Pass `--no-symlinks` to use hard links instead and skip the prompt.
 
 ## Links
