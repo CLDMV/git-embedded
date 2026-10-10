@@ -89,7 +89,8 @@ afterEach(() => {
 	} catch {
 		// ignore
 	}
-	process.env = originalEnv;
+	for (const k of Object.keys(process.env)) delete process.env[k];
+	Object.assign(process.env, originalEnv); // restore in place: reassigning process.env breaks child-process env inheritance on Node >=26.11
 	if (originalIsTTYDescriptor) Object.defineProperty(process.stdin, "isTTY", originalIsTTYDescriptor);
 	else delete process.stdin.isTTY;
 	if (originalPlatformDescriptor) Object.defineProperty(process, "platform", originalPlatformDescriptor);
