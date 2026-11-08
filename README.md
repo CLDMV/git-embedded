@@ -8,17 +8,18 @@ Manage embedded git repositories (anonymous gitlinks) without `.gitmodules`. Pro
 
 ## ✨ What's New
 
-### Latest: v1.1.13 (October 2026)
+### Latest: v1.2.0 (November 2026)
 
-- **Node.js floor raised to 22.15** — `engines.node` moves from `>=22.12.0` to `>=22.15.0` to match `@cldmv/slothlet` 3.22 ([#104](https://github.com/CLDMV/git-embedded/pull/104)), and the tests restore `process.env` in place so the Node.js 26.11 CI leg passes ([#103](https://github.com/CLDMV/git-embedded/pull/103)). Nothing the package publishes changed. The lockfile now resolves `@cldmv/slothlet` 3.22.0 and `@cldmv/wisp` 1.0.6, plus `@cldmv/vitest-runner` 1.5.3, `vitest` 5.0.3 and `eslint` 10.12.0 for development ([#96](https://github.com/CLDMV/git-embedded/pull/96), [#97](https://github.com/CLDMV/git-embedded/pull/97), [#99](https://github.com/CLDMV/git-embedded/pull/99), [#101](https://github.com/CLDMV/git-embedded/pull/101)).
-- [View full v1.1.13 Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.13.md)
+- **A real build** — The CLI moved to `src/bin/`, and tsup builds all of `src/` into `dist/` file by file. The package ships `dist/` instead of `bin/` and `src/`, and `git-embedded` runs `dist/bin/git-embedded.mjs`; the commands and hooks are unchanged ([#125](https://github.com/CLDMV/git-embedded/pull/125)).
+- **Separate runtime and development Node.js floors** — `engines.node` stays `>=22.15.0`, and the test toolchain's `>=22.22.0` moves to `devEngines` and the CI minimum ([#122](https://github.com/CLDMV/git-embedded/pull/122)).
+- [View full v1.2.0 Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.2.0.md)
 
 ### Recent Releases
 
+- **v1.1.13** (October 2026) — `engines.node` raised to `>=22.15.0` to match `@cldmv/slothlet` 3.22, and tests restore `process.env` in place for Node.js 26.11; no published file changed (#103, #104) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.13.md))
 - **v1.1.12** (October 2026) — header tooling on `@cldmv/fix-headers` 2.2.0 (`@Last modified by` now follows content edits only) with `@cldmv/configs` 1.2.4, and a complete changelog history from v1.0.0; no CLI code, hook, published file or runtime dependency changed (#90, #91, #94) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.12.md))
 - **v1.1.11** (October 2026) — the CI `✅ Required PR Check` mirror job runs on every path instead of being skipped on in-repo PRs, plus lockfile updates (#85, #86, #88) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.11.md))
 - **v1.1.10** (October 2026) — uniform file headers from the shared CLDMV config, the verbatim Apache-2.0 license text, a v4.29.2 workflow sync and a batch of dependency updates (#76, #79, #80, #82, #83, #84) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.10.md))
-- **v1.1.9** (September 2026) — the canonical CLDMV ESLint/Prettier config with `.jsonv` support, the vitest 5 Node range in CI, and signed redirected security PRs (#48) ([Changelog](https://github.com/CLDMV/git-embedded/blob/master/docs/changelog/v1/v1.1.9.md))
 
 📚 **For complete version history, see [docs/changelog/](https://github.com/CLDMV/git-embedded/tree/master/docs/changelog/) and the [GitHub Releases](https://github.com/CLDMV/git-embedded/releases).**
 
@@ -220,7 +221,7 @@ git config core.hooksPath .githooks
 ## Compatibility
 
 - **Git 2.28 or newer** for the `reference-transaction` hook (released July 2020). The `update-embedded-repos` hook works on older git but loses its guard.
-- **Node 22.15+** for the CLI. The hooks themselves are shell scripts with no Node dependency at hook execution time.
+- **Node 22.15+** for the CLI (development needs Node 22.22.0+). The hooks themselves are shell scripts with no Node dependency at hook execution time.
 - **Linux / macOS / Windows.** On Windows, symlink creation needs admin elevation (a one-shot UAC prompt the CLI requests). Pass `--no-symlinks` to use hard links instead and skip the prompt.
 
 ## Links
