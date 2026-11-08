@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -84,6 +85,12 @@ afterEach(() => {
 });
 
 describe("git-embedded bin entry", () => {
+	it("starts without slothlet configuration warnings", () => {
+		const res = spawnSync(process.execPath, [fileURLToPath(entry), "--help"], { encoding: "utf8" });
+		expect(res.status).toBe(0);
+		expect(res.stderr).not.toMatch(/deprecated/i);
+	});
+
 	it("shows root help and exits 0 with no arguments", async () => {
 		const res = await runCli([]);
 		expect(res.code).toBe(0);

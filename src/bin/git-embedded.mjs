@@ -52,7 +52,7 @@ while (!fs.existsSync(path.join(packageRoot, "package.json")) && path.dirname(pa
 const apiDir = path.resolve(here, "..", "api");
 
 const api = await slothlet({
-	dir: apiDir,
+	base: apiDir,
 	context: {
 		fs,
 		path,
