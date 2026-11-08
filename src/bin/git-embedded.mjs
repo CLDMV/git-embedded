@@ -8,7 +8,7 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-07T22:29:02-08:00 (1794119342)
+ *	@Last modified time: 2026-11-08T00:15:17-08:00 (1794125717)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -41,13 +41,15 @@ if (typeof Command.prototype.examples !== "function") {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-// This file runs from src/bin/ in a checkout and from the built bin/ in the
-// published package, so find the package root by its package.json.
+// This file runs from src/bin/ in a checkout and from dist/bin/ in the
+// published package, so find the package root (hooks/, messages/) by its package.json.
 let packageRoot = here;
 while (!fs.existsSync(path.join(packageRoot, "package.json")) && path.dirname(packageRoot) !== packageRoot) {
 	packageRoot = path.dirname(packageRoot);
 }
-const apiDir = path.join(packageRoot, "src", "api");
+// The API folder sits next to this file's folder: src/api in a checkout,
+// dist/api in the published package.
+const apiDir = path.resolve(here, "..", "api");
 
 const api = await slothlet({
 	dir: apiDir,

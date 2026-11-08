@@ -7,25 +7,28 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-11-07T22:29:03-08:00 (1794119343)
+ *	@Last modified time: 2026-11-08T00:15:18-08:00 (1794125718)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
 /**
- * @fileoverview Builds the CLI: src/bin/git-embedded.mjs → bin/git-embedded.mjs.
+ * @fileoverview Builds dist/ from src/, file by file.
  *
- * bin/ is the published path ("bin" in package.json) and a build artifact, not
- * tracked in git. The CLI only imports packages (runtime dependencies stay
- * external), and it loads the slothlet API from src/api/ at runtime, which is
- * why src/ still ships in `files`. esbuild keeps the shebang line.
+ * slothlet discovers the API by walking the api/ folder at runtime, so the
+ * build keeps every file at the same relative path (`bundle: false`):
+ * src/api/** → dist/api/**, src/lib/** → dist/lib/**, and the CLI
+ * src/bin/git-embedded.mjs → dist/bin/git-embedded.mjs ("bin" in
+ * package.json). Runtime dependencies stay external. esbuild keeps the
+ * CLI's shebang line.
  */
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: { "git-embedded": "src/bin/git-embedded.mjs" },
-	outDir: "bin",
+	entry: ["src/**/*.mjs"],
+	outDir: "dist",
+	bundle: false,
 	format: ["esm"],
 	target: "node22",
 	platform: "node",

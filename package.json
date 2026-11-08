@@ -61,9 +61,7 @@
 		"cli"
 	],
 	"files": [
-		"bin",
-		"src",
-		"!src/bin/",
+		"dist",
 		"hooks",
 		"messages",
 		"docs",
@@ -71,7 +69,7 @@
 		"LICENSE"
 	],
 	"bin": {
-		"git-embedded": "./bin/git-embedded.mjs"
+		"git-embedded": "./dist/bin/git-embedded.mjs"
 	},
 	"scripts": {
 		"start": "node src/bin/git-embedded.mjs",
