@@ -63,6 +63,7 @@
 	"files": [
 		"bin",
 		"src",
+		"!src/bin/",
 		"hooks",
 		"messages",
 		"docs",
@@ -73,8 +74,8 @@
 		"git-embedded": "./bin/git-embedded.mjs"
 	},
 	"scripts": {
-		"start": "node bin/git-embedded.mjs",
-		"build:ci": "echo '✓ no build step'",
+		"start": "node src/bin/git-embedded.mjs",
+		"build:ci": "npm run lint && npm run format:check && npm run build",
 		"test": "node tests/run-vitest.mjs",
 		"test:watch": "vitest --config .configs/vitest.config.mjs",
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
@@ -83,8 +84,9 @@
 		"lint:fix": "eslint --config .configs/eslint.config.mjs . --fix",
 		"format": "prettier --config .configs/.prettierrc --write .",
 		"format:check": "prettier --config .configs/.prettierrc --check .",
-		"build": "echo 'no build step - stopgap for CI coverage-badge; see tracking issue'",
-		"fix:headers": "fix-headers --config .configs/fix-headers.json"
+		"build": "tsup",
+		"fix:headers": "fix-headers --config .configs/fix-headers.json",
+		"prepack": "npm run build"
 	},
 	"dependencies": {
 		"@cldmv/slothlet": "^3.7.0",
@@ -109,6 +111,8 @@
 		"eslint": "^10.8.0",
 		"globals": "^17.7.0",
 		"prettier": "^3.4.2",
+		"tsup": "^9.0.0",
+		"typescript": "^6.0.3",
 		"vitest": "^5.0.0"
 	}
 }

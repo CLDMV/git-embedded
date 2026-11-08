@@ -10,3 +10,6 @@ tmp/
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# CLI build output (tsup, from src/bin/)
+/bin/

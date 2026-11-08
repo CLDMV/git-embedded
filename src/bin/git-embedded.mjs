@@ -2,13 +2,13 @@
 /**
  *
  *	@Project: @cldmv/git-embedded
- *	@Filename: /bin/git-embedded.mjs
+ *	@Filename: /src/bin/git-embedded.mjs
  *	@Date: 2026-05-24T21:13:00-07:00 (1779682380)
  *	@Author: Nate Corcoran <CLDMV>
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:20:13-07:00 (1790968813)
+ *	@Last modified time: 2026-11-07T22:29:02-08:00 (1794119342)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
@@ -41,7 +41,12 @@ if (typeof Command.prototype.examples !== "function") {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const packageRoot = path.resolve(here, "..");
+// This file runs from src/bin/ in a checkout and from the built bin/ in the
+// published package, so find the package root by its package.json.
+let packageRoot = here;
+while (!fs.existsSync(path.join(packageRoot, "package.json")) && path.dirname(packageRoot) !== packageRoot) {
+	packageRoot = path.dirname(packageRoot);
+}
 const apiDir = path.join(packageRoot, "src", "api");
 
 const api = await slothlet({
@@ -64,10 +69,9 @@ const api = await slothlet({
 	}
 });
 
-const { CustomHelp, applyCustomHelpRecursive } = api.commander.customHelp.makeCustomHelp(Help, { chalk });
+const { applyCustomHelpRecursive } = api.commander.customHelp.makeCustomHelp(Help, { chalk });
 
 const program = new Command();
-program.createHelp = () => new CustomHelp();
 program
 	.name("git-embedded")
 	.description(
@@ -118,6 +122,8 @@ try {
 		} else if (process.argv[2]) {
 			const sub = program.commands.find((cmd) => {
 				if (cmd.name() === process.argv[2]) return true;
+				// Defensive: Command always has aliases(); the `_aliases` fallback guards a commander without it and isn't reproducible in the suite.
+				/* v8 ignore next */
 				const aliases = typeof cmd.aliases === "function" ? cmd.aliases() : cmd._aliases;
 				return Array.isArray(aliases) && aliases.includes(process.argv[2]);
 			});
@@ -176,6 +182,8 @@ function registerCommand(programInstance, spec, run) {
 	cmd.action(async (...actionArgs) => {
 		const last = actionArgs[actionArgs.length - 1];
 		const isCmd = last && typeof last === "object" && typeof last.opts === "function";
+		// Defensive: commander always passes the Command last; the non-Command side is not reproducible in the suite.
+		/* v8 ignore next */
 		const trimmed = isCmd ? actionArgs.slice(0, -1) : actionArgs;
 		await run(...trimmed);
 	});
