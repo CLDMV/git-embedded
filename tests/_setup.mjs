@@ -42,7 +42,7 @@ let apiPromise = null;
 export function getApi() {
 	if (!apiPromise) {
 		apiPromise = slothlet({
-			dir: apiDir,
+			base: apiDir,
 			context: {
 				fs,
 				path,
