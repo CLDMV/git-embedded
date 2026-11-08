@@ -7,13 +7,13 @@
  *	@Email: <Shinrai@users.noreply.github.com>
  *	-----
  *	@Last modified by: Nate Corcoran <CLDMV> (Shinrai@users.noreply.github.com)
- *	@Last modified time: 2026-10-02T12:20:23-07:00 (1790968823)
+ *	@Last modified time: 2026-11-08T00:15:17-08:00 (1794125717)
  *	-----
  *	@Copyright: Copyright (c) 2013-2026 Catalyzed Motivation Inc. All rights reserved.
  *
  */
 
-import { self, context } from "@cldmv/slothlet/runtime";
+import { context } from "@cldmv/slothlet/runtime";
 
 const ERROR_CANCELLED = 1223;
 
@@ -41,7 +41,8 @@ export default function elevateWindows(plan) {
 	const tmpPath = path.join(os.tmpdir(), `git-embedded-symlink-batch-${process.pid}-${Date.now()}.json`);
 	fs.writeFileSync(tmpPath, JSON.stringify(plan, null, 2));
 
-	const childScript = path.join(self.paths.packageRoot(), "src", "lib", "elevate-windows-child.mjs");
+	// Resolved next to this module, so it is src/lib in a checkout and dist/lib when published.
+	const childScript = context.fileURLToPath(new URL("../../lib/elevate-windows-child.mjs", import.meta.url));
 	const node = process.execPath;
 
 	const argList = [childScript, tmpPath].map((s) => `'${s.replace(/'/g, "''")}'`).join(",");
